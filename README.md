@@ -8,6 +8,7 @@ A dark, Apple Stocks-inspired stock tracker with live-feeling delayed quotes, fa
 - Set a cash amount and see how many shares it buys per symbol.
 - Add custom tickers, search the watchlist, and favorite symbols.
 - Open any stock card for a larger stat view with OHLC, quant metrics, candles, line, returns, technicals, risk, and modelled depth.
+- Local ML signals trained in-browser from each ticker's loaded OHLC history: next-session up probability, similar-setup expected move, holdout hit rate, feature driver, and ML chart tab.
 - Uses browser local storage for watchlist, favorites, cached quotes, and cash amount.
 
 ## Data Sources
@@ -16,6 +17,8 @@ A dark, Apple Stocks-inspired stock tracker with live-feeling delayed quotes, fa
 - Browser CORS wrapper: `corsproxy.io`, because the upstream chart endpoint blocks direct browser origins.
 
 No API key is required for the default setup. The data adapter is isolated in `src/services/stocks.ts` so a paid or official feed can replace it later.
+
+The ML panel is intentionally lightweight and explainable. It trains only on the loaded daily candles for the selected ticker and should be treated as an exploratory quant signal, not financial advice.
 
 ## Run Locally
 

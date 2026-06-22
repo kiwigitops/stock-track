@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Gauge, LineChart, Star, X } from "lucide-react";
 import { candleToRatePoints, getStats } from "../lib/analytics";
 import { formatCompact, formatMoney, formatPercent, formatPrice, formatRate, venueName } from "../lib/format";
+import { getMlSignals } from "../lib/ml";
 import type { ChartMode, StockQuote } from "../types";
 import { InfoTip } from "./InfoTip";
 import { BrokerWorkspace } from "./charts/BrokerWorkspace";
@@ -14,7 +15,7 @@ type QuoteModalProps = {
   quote: StockQuote;
 };
 
-const chartModes: ChartMode[] = ["candles", "line", "returns", "technicals", "risk", "depth"];
+const chartModes: ChartMode[] = ["candles", "line", "returns", "technicals", "risk", "depth", "ml"];
 
 export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: QuoteModalProps) {
   const [chartMode, setChartMode] = useState<ChartMode>("candles");
@@ -29,6 +30,7 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
 
   const ratePoints = useMemo(() => candleToRatePoints(quote.candles), [quote.candles]);
   const stats = useMemo(() => getStats(ratePoints, quote.price), [quote.price, ratePoints]);
+  const ml = useMemo(() => getMlSignals(quote.candles), [quote.candles]);
   const shares = quote.price ? cash / quote.price : 0;
 
   return (
@@ -112,19 +114,53 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
           </div>
         </section>
 
+        <section className="quant-panel ml-panel" aria-label="ML signals">
+          <div className="panel-heading">
+            <span>ML signals</span>
+            <InfoTip text="A tiny local model trains on this symbol's loaded daily candles. It is a pattern signal, not investment advice or a real prediction engine." />
+          </div>
+          <div className="quant-grid">
+            <ModalStat
+              detail="Logistic classifier probability that the next loaded-style daily candle closes higher than the latest close."
+              label="Up prob"
+              tone={ml.probabilityUp >= 0.5 ? "positive" : "negative"}
+              value={formatPercent(ml.probabilityUp)}
+            />
+            <ModalStat
+              detail="Average next-day return from the most similar historical feature setups in this symbol's candle history."
+              label="Expected"
+              tone={ml.expectedMove >= 0 ? "positive" : "negative"}
+              value={formatPercent(ml.expectedMove, true)}
+            />
+            <ModalStat
+              detail="Confidence blends distance from 50% probability with validation hit rate. Higher means the model is less ambivalent, not necessarily correct."
+              label="Confidence"
+              value={formatPercent(ml.confidence)}
+            />
+            <ModalStat
+              detail="Chronological holdout hit rate from the final quarter of labelled samples."
+              label="Holdout hit"
+              value={ml.testAccuracy ? formatPercent(ml.testAccuracy) : "n/a"}
+            />
+            <ModalStat detail="Current model regime inferred from probability, volatility, and similar-setup expected move." label="Regime" value={ml.regime} />
+            <ModalStat detail="Largest signed feature contribution in the local logistic model." label="Driver" value={ml.topDriver} />
+          </div>
+        </section>
+
         <section className="dataset-board" aria-label="Dataset information">
           <DatasetCard detail="Delayed quote and OHLC metadata from Yahoo Finance's public chart endpoint." label="Quote" value={quote.provider} />
           <DatasetCard detail="The static browser app fetches through a public CORS wrapper because the upstream chart endpoint does not allow direct browser origins." label="Proxy" value="corsproxy.io" />
           <DatasetCard detail="Stats, volatility, drawdown, percentile, z-score, technicals, and risk views are calculated locally from loaded candles." label="Derived" value="Local" />
           <DatasetCard detail="Candles use actual daily OHLC values from the chart feed when available." label="Candles" value="Daily OHLC" />
           <DatasetCard detail="Depth view is a broker-style liquidity model from price, volatility, and momentum. It is not a live order book." label="Depth" value="Modelled" />
+          <DatasetCard detail="ML signals are trained locally from this ticker's loaded candles using logistic classification and similar-pattern averaging." label="ML" value={ml.status === "ready" ? "Local model" : "Needs data"} />
         </section>
 
         <section className="deep-chart">
           <div className="chart-title">
             {chartMode === "depth" ? <Gauge size={18} /> : <LineChart size={18} />}
             <div>
-              <strong>{chartMode === "depth" ? "Market depth" : "1Y chart"}</strong>
+              <strong>{chartMode === "depth" ? "Market depth" : chartMode === "ml" ? "ML signal" : "1Y chart"}</strong>
               <span>
                 {quote.symbol}/{quote.currency}
               </span>
@@ -143,7 +179,9 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
                         ? "Technicals"
                         : mode === "risk"
                           ? "Risk"
-                          : "Depth"}
+                          : mode === "depth"
+                            ? "Depth"
+                            : "ML"}
               </button>
             ))}
           </div>

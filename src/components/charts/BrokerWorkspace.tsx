@@ -12,6 +12,7 @@ import {
   standardDeviation,
 } from "../../lib/analytics";
 import { formatCompact, formatPercent, formatPrice, formatRate } from "../../lib/format";
+import { getMlSignals } from "../../lib/ml";
 import type { ChartMode, RatePoint, StockCandle } from "../../types";
 
 type ChartTooltipPosition = {
@@ -53,6 +54,7 @@ export function BrokerWorkspace({ candles, currentRate, mode }: BrokerWorkspaceP
   if (mode === "depth") return <DepthView currentRate={currentRate} points={points} />;
   if (mode === "technicals") return <TechnicalsView points={points} />;
   if (mode === "risk") return <RiskView points={points} />;
+  if (mode === "ml") return <MlView candles={candles} />;
   return <BigChart points={points} />;
 }
 
@@ -438,6 +440,70 @@ function RiskView({ points }: { points: RatePoint[] }) {
         <BrokerDatum label="Reward/risk" tone={rewardRisk >= 0 ? "positive" : "negative"} value={formatCompact(rewardRisk, 2)} />
         <BrokerDatum label="Worst close" value={formatPrice(Math.min(...values))} />
         <BrokerDatum label="Best close" value={formatPrice(Math.max(...values))} />
+      </div>
+    </div>
+  );
+}
+
+function MlView({ candles }: { candles: StockCandle[] }) {
+  const ml = getMlSignals(candles);
+  const history = ml.probabilityHistory;
+
+  if (ml.status === "limited" || history.length < 2) {
+    return (
+      <div className="chart-fallback">
+        <Gauge size={28} />
+        <span>More candles are needed for ML signals</span>
+      </div>
+    );
+  }
+
+  const width = 900;
+  const height = 260;
+  const pad = 24;
+  const line = history
+    .map((point, index) => {
+      const x = pad + (index / (history.length - 1)) * (width - pad * 2);
+      const y = pad + (1 - point.probabilityUp) * (height - pad * 2);
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
+  const area = `${line} L ${width - pad} ${height - pad} L ${pad} ${height - pad} Z`;
+  const maxContribution = Math.max(...ml.features.map((feature) => Math.abs(feature.contribution)), 0.001);
+
+  return (
+    <div className="ml-view">
+      <svg aria-label="ML probability chart" className="ml-chart" preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`}>
+        <defs>
+          <linearGradient id="mlFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#64d2ff" stopOpacity="0.24" />
+            <stop offset="100%" stopColor="#64d2ff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line className="chart-grid" x1={pad} x2={width - pad} y1={pad} y2={pad} />
+        <line className="chart-grid zero" x1={pad} x2={width - pad} y1={height / 2} y2={height / 2} />
+        <line className="chart-grid" x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} />
+        <path className="ml-area" d={area} />
+        <path className="ml-line" d={line} />
+      </svg>
+      <div className="broker-panels technical-grid">
+        <BrokerDatum label="Up prob" tone={ml.probabilityUp >= 0.5 ? "positive" : "negative"} value={formatPercent(ml.probabilityUp)} />
+        <BrokerDatum label="Expected" tone={ml.expectedMove >= 0 ? "positive" : "negative"} value={formatPercent(ml.expectedMove, true)} />
+        <BrokerDatum label="Confidence" value={formatPercent(ml.confidence)} />
+        <BrokerDatum label="Holdout hit" value={formatPercent(ml.testAccuracy)} />
+        <BrokerDatum label="Samples" value={formatCompact(ml.sampleSize, 0)} />
+        <BrokerDatum label="Regime" value={ml.regime} />
+      </div>
+      <div className="feature-stack" aria-label="ML feature contributions">
+        {ml.features.slice(0, 6).map((feature) => (
+          <div className={feature.direction === "bullish" ? "feature-row positive" : "feature-row negative"} key={feature.label}>
+            <span>{feature.label}</span>
+            <div>
+              <em style={{ width: `${(Math.abs(feature.contribution) / maxContribution) * 100}%` }} />
+            </div>
+            <strong>{formatCompact(feature.contribution, 3)}</strong>
+          </div>
+        ))}
       </div>
     </div>
   );

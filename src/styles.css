@@ -908,7 +908,7 @@ select option {
 
 .chart-tabs {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--space-2);
   margin-bottom: var(--space-4);
   padding: var(--space-1);
@@ -1003,7 +1003,8 @@ select option {
 .returns-view,
 .depth-view,
 .technicals-view,
-.risk-view {
+.risk-view,
+.ml-view {
   display: grid;
   gap: var(--space-3);
 }
@@ -1058,6 +1059,76 @@ select option {
 
 .return-bar.down {
   fill: #ff453a;
+}
+
+.ml-chart {
+  display: block;
+  width: 100%;
+  height: 260px;
+}
+
+.ml-area {
+  fill: url(#mlFill);
+}
+
+.ml-line {
+  fill: none;
+  stroke: #64d2ff;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.feature-stack {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-panel);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.feature-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 72px;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.feature-row span,
+.feature-row strong {
+  color: rgba(245, 247, 251, 0.66);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.feature-row strong {
+  color: #ffffff;
+  text-align: right;
+}
+
+.feature-row div {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.feature-row em {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: currentColor;
+}
+
+.feature-row.positive {
+  color: #31d158;
+}
+
+.feature-row.negative {
+  color: #ff453a;
 }
 
 .broker-panels {
