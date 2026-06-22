@@ -1,17 +1,18 @@
 import { ChevronRight, Star } from "lucide-react";
 import { formatCompact, formatMoney, formatPercent, formatPrice, formatShares, venueName } from "../lib/format";
-import type { StockQuote } from "../types";
+import type { ChartRangeKey, StockQuote } from "../types";
 import { MiniSpark } from "./MiniSpark";
 
 type QuoteCardProps = {
   cash: number;
+  chartRange: ChartRangeKey;
   isFavorite: boolean;
   onFavorite: () => void;
   onOpen: () => void;
   quote: StockQuote;
 };
 
-export function QuoteCard({ cash, isFavorite, onFavorite, onOpen, quote }: QuoteCardProps) {
+export function QuoteCard({ cash, chartRange, isFavorite, onFavorite, onOpen, quote }: QuoteCardProps) {
   const isDown = quote.change < 0;
   const shares = quote.price ? cash / quote.price : 0;
 
@@ -21,7 +22,7 @@ export function QuoteCard({ cash, isFavorite, onFavorite, onOpen, quote }: Quote
         <Star size={15} fill={isFavorite ? "currentColor" : "none"} />
       </button>
 
-      <button className="quote-open" onClick={onOpen}>
+      <button className="quote-open" onClick={onOpen} title={`Open ${quote.symbol} expanded chart view`}>
         <span className="card-region">{venueName(quote.exchange)}</span>
         <div className="symbol-line">
           <strong>{quote.symbol}</strong>
@@ -29,7 +30,7 @@ export function QuoteCard({ cash, isFavorite, onFavorite, onOpen, quote }: Quote
         </div>
         <span className="currency-name">{quote.name}</span>
 
-        <MiniSpark move={quote.changePercent * 100} />
+        <MiniSpark candles={quote.candles} currency={quote.currency} range={chartRange} symbol={quote.symbol} />
 
         <div className="card-price">
           <strong>{formatPrice(quote.price, quote.currency)}</strong>

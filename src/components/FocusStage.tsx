@@ -1,16 +1,17 @@
 import { LoaderCircle } from "lucide-react";
 import { formatDateTime, formatMoney, formatPercent, formatPrice, formatShares, venueName } from "../lib/format";
-import type { StockQuote } from "../types";
+import type { ChartRangeKey, StockQuote } from "../types";
 import { MiniSpark } from "./MiniSpark";
 
 type FocusStageProps = {
   cash: number;
+  chartRange: ChartRangeKey;
   headline?: StockQuote;
   onOpen: (quote: StockQuote) => void;
   quotes: StockQuote[];
 };
 
-export function FocusStage({ cash, headline, onOpen, quotes }: FocusStageProps) {
+export function FocusStage({ cash, chartRange, headline, onOpen, quotes }: FocusStageProps) {
   if (!headline) {
     return (
       <section className="focus-stage">
@@ -26,14 +27,14 @@ export function FocusStage({ cash, headline, onOpen, quotes }: FocusStageProps) 
 
   return (
     <section className="focus-stage" aria-label="Focused stock market">
-      <button className="focus-panel" onClick={() => onOpen(headline)}>
+      <button className="focus-panel" onClick={() => onOpen(headline)} title={`Open ${headline.symbol} expanded chart view`}>
         <div className="focus-kicker">
           <span>{venueName(headline.exchange)}</span>
           <em className={headline.change < 0 ? "down" : "up"}>{formatPercent(headline.changePercent, true)}</em>
         </div>
         <strong className="focus-symbol">{headline.symbol}</strong>
         <span className="focus-name">{headline.name}</span>
-        <MiniSpark move={headline.changePercent * 100} />
+        <MiniSpark candles={headline.candles} currency={headline.currency} range={chartRange} symbol={headline.symbol} variant="focus" />
         <div className="focus-bottom">
           <div>
             <span>{formatMoney(cash, headline.currency)} allocation</span>
@@ -52,7 +53,7 @@ export function FocusStage({ cash, headline, onOpen, quotes }: FocusStageProps) 
           <strong>{formatDateTime(headline.updatedAt)}</strong>
         </div>
         {quotes.map((quote) => (
-          <button key={quote.symbol} onClick={() => onOpen(quote)}>
+          <button key={quote.symbol} onClick={() => onOpen(quote)} title={`Open ${quote.symbol} expanded chart view`}>
             <div>
               <strong>{quote.symbol}</strong>
               <span>{quote.name}</span>

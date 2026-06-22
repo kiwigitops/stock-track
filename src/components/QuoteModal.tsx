@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, ChevronLeft, ChevronRight, Gauge, LineChart, Star, X } from "lucide-react";
 import { candleToRatePoints, getStats } from "../lib/analytics";
+import { CHART_RANGE_KEYS, getChartRangeLabel } from "../lib/chartRanges";
 import { DEFAULT_ML_SETTINGS, ML_SETTINGS_KEY } from "../lib/constants";
 import { formatCompact, formatMoney, formatPercent, formatPrice, formatRate, venueName } from "../lib/format";
 import { getHorizonLabel, getMlSignals } from "../lib/ml";
@@ -21,7 +22,6 @@ type QuoteModalProps = {
 };
 
 const chartModes: ChartMode[] = ["candles", "line", "returns", "technicals", "risk", "depth", "projections"];
-const chartRanges: ChartRangeKey[] = ["1m", "3m", "6m", "1y", "5y"];
 
 export function QuoteModal({ cash, isFavorite, navLabel, onClose, onFavorite, onNext, onPrevious, quote }: QuoteModalProps) {
   const [chartMode, setChartMode] = useState<ChartMode>("candles");
@@ -266,7 +266,7 @@ export function QuoteModal({ cash, isFavorite, navLabel, onClose, onFavorite, on
               <InfoTip text="This filter changes the visible history in every chart and data view. Projection training still follows the training-window setting above; this controls the chart view." />
             </span>
             <div className="range-tabs" aria-label="Visible chart range">
-              {chartRanges.map((range) => (
+              {CHART_RANGE_KEYS.map((range) => (
                 <button className={chartRange === range ? "active" : ""} key={range} onClick={() => setChartRange(range)} type="button">
                   {getChartRangeLabel(range)}
                 </button>
@@ -310,14 +310,6 @@ function getChartModeDescription(mode: ChartMode, symbol: string, currency: stri
   if (mode === "risk") return "Drawdown, volatility, and downside-risk measures from the selected range.";
   if (mode === "depth") return "A modeled broker-style book derived from price, volatility, and momentum.";
   return "Forward projection probabilities, expected moves, drivers, and trend stack.";
-}
-
-function getChartRangeLabel(range: ChartRangeKey) {
-  if (range === "1m") return "1M";
-  if (range === "3m") return "3M";
-  if (range === "6m") return "6M";
-  if (range === "1y") return "1Y";
-  return "5Y";
 }
 
 function ModalStat({

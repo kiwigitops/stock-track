@@ -321,8 +321,7 @@ em {
   font-weight: 850;
 }
 
-.focus-panel .spark {
-  height: 74px;
+.focus-panel .spark-shell {
   margin: 20px 0 12px;
 }
 
@@ -447,11 +446,17 @@ em {
 }
 
 .quote-controls.stock-controls {
-  grid-template-columns: minmax(130px, 0.5fr) minmax(170px, 0.6fr) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(130px, 0.46fr) minmax(140px, 0.42fr) minmax(170px, 0.58fr) minmax(220px, 1fr) auto;
 }
 
 .quote-controls label {
   display: grid;
+  gap: var(--space-2);
+}
+
+.quote-controls label > span {
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
 }
 
@@ -650,19 +655,164 @@ select option {
   white-space: nowrap;
 }
 
+.spark-shell {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  margin: 18px 0;
+  color: #31d158;
+}
+
+.spark-shell.down {
+  color: #ff453a;
+}
+
+.spark-head,
+.spark-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.spark-head span,
+.spark-foot span,
+.spark-foot strong {
+  overflow: hidden;
+  color: rgba(245, 247, 251, 0.54);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.spark-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spark-head span i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 14px currentColor;
+}
+
+.spark-head strong {
+  color: currentColor;
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.spark-chart {
+  position: relative;
+  min-height: 68px;
+}
+
+.spark-shell.focus .spark-chart {
+  min-height: 88px;
+}
+
 .spark {
   display: block;
   width: 100%;
-  height: 54px;
-  margin: 18px 0;
+  height: 68px;
+  cursor: crosshair;
 }
 
-.spark polyline {
+.spark-shell.focus .spark {
+  height: 88px;
+}
+
+.spark-line,
+.spark-area,
+.spark-grid,
+.spark-focus-line,
+.spark-marker {
+  pointer-events: none;
+}
+
+.spark-line {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 3.2;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: draw-line 720ms var(--ease-out);
+}
+
+.spark-area {
+  opacity: 0.82;
+  animation: fade-up 420ms var(--ease-out);
+}
+
+.spark-grid {
+  stroke: rgba(245, 247, 251, 0.1);
+  stroke-width: 0.8;
+}
+
+.spark-axis {
+  fill: rgba(245, 247, 251, 0.44);
+  font-size: 5px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.spark-focus-line {
+  stroke: rgba(245, 247, 251, 0.38);
+  stroke-dasharray: 2 2;
+  stroke-width: 1;
+}
+
+.spark-marker {
+  fill: #ffffff;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.spark-tooltip {
+  position: absolute;
+  z-index: 4;
+  min-width: 118px;
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  color: #ffffff;
+  background: rgba(5, 8, 12, 0.94);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 8px));
+  animation: tooltip-pop var(--motion-fast) var(--ease-out);
+}
+
+.spark-tooltip span,
+.spark-tooltip strong {
+  display: block;
+}
+
+.spark-tooltip span {
+  color: rgba(245, 247, 251, 0.58);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.spark-tooltip strong {
+  color: #ffffff;
+  font-size: 0.88rem;
+}
+
+.spark-empty {
+  display: grid;
+  min-height: 68px;
+  place-items: center;
+  color: rgba(245, 247, 251, 0.5);
+  font-size: 0.82rem;
+  font-weight: 850;
 }
 
 .card-price strong {
@@ -1075,6 +1225,27 @@ select option {
 @keyframes tooltip-pop {
   from {
     opacity: 0;
+  }
+}
+
+@keyframes draw-line {
+  from {
+    opacity: 0.35;
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes bar-grow {
+  from {
+    opacity: 0.25;
+    transform: scaleY(0.12);
   }
 }
 
@@ -1570,10 +1741,12 @@ select option {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 5;
+  animation: fade-up 520ms var(--ease-out);
 }
 
 .big-chart .area {
   fill: url(#chartFill);
+  animation: fade-up 420ms var(--ease-out);
 }
 
 .chart-grid {
@@ -1597,10 +1770,14 @@ select option {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-width: 2;
+  animation: fade-up 420ms var(--ease-out);
 }
 
 .candle rect {
   fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: bar-grow 460ms var(--ease-out);
 }
 
 .candle.up {
@@ -1645,6 +1822,7 @@ select option {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 4;
+  animation: fade-up 500ms var(--ease-out);
 }
 
 .technical-line.price {
@@ -1663,6 +1841,7 @@ select option {
 
 .drawdown-area {
   fill: rgba(255, 69, 58, 0.18);
+  animation: fade-up 420ms var(--ease-out);
 }
 
 .drawdown-line {
@@ -1671,6 +1850,13 @@ select option {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 4;
+  animation: fade-up 520ms var(--ease-out);
+}
+
+.return-bar {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: bar-grow 460ms var(--ease-out);
 }
 
 .return-bar.up {
@@ -1690,6 +1876,7 @@ select option {
 
 .projection-area {
   fill: url(#projectionFill);
+  animation: fade-up 420ms var(--ease-out);
 }
 
 .projection-line {
@@ -1698,6 +1885,7 @@ select option {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 4;
+  animation: fade-up 520ms var(--ease-out);
 }
 
 .feature-stack {
@@ -1749,6 +1937,7 @@ select option {
   inset: 0 auto 0 0;
   border-radius: inherit;
   background: currentColor;
+  animation: fade-up 360ms var(--ease-out);
 }
 
 .feature-row.positive {

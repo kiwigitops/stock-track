@@ -3,14 +3,16 @@ import { Gauge, LoaderCircle, Plus, RefreshCcw, Search, Star } from "lucide-reac
 import MarketScene from "./MarketScene";
 import { AboutPanel } from "./components/AboutPanel";
 import { FocusStage } from "./components/FocusStage";
+import { InfoTip } from "./components/InfoTip";
 import { PaperTradeDesk } from "./components/PaperTradeDesk";
 import { QuoteCard } from "./components/QuoteCard";
 import { QuoteModal } from "./components/QuoteModal";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { useStocks } from "./hooks/useStocks";
+import { CHART_RANGE_KEYS, getChartRangeLabel } from "./lib/chartRanges";
 import { CASH_KEY, DEFAULT_CASH, FAVORITES_KEY, SYMBOLS_KEY, WATCHLIST } from "./lib/constants";
 import { normalizeSymbol } from "./lib/format";
-import type { StockQuote } from "./types";
+import type { ChartRangeKey, StockQuote } from "./types";
 
 export default function App() {
   const [cash, setCash] = usePersistentState(CASH_KEY, DEFAULT_CASH);
@@ -21,6 +23,7 @@ export default function App() {
   const [selected, setSelected] = useState<StockQuote | null>(null);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [activeView, setActiveView] = useState<"about" | "market" | "paper">("market");
+  const [mainChartRange, setMainChartRange] = useState<ChartRangeKey>("1y");
 
   const symbols = useMemo(() => {
     return Array.from(new Set([...favorites, ...WATCHLIST, ...customSymbols].map(normalizeSymbol).filter(Boolean)));
@@ -101,7 +104,7 @@ export default function App() {
             </div>
           </nav>
 
-          <FocusStage cash={cash} headline={headline} onOpen={setSelected} quotes={focusQuotes} />
+          <FocusStage cash={cash} chartRange={mainChartRange} headline={headline} onOpen={setSelected} quotes={focusQuotes} />
         </header>
 
         <div className="app-tabs" aria-label="Workspace views">
@@ -127,6 +130,20 @@ export default function App() {
                 type="number"
                 value={cash}
               />
+            </label>
+
+            <label>
+              <span>
+                Chart range
+                <InfoTip text="Controls the real close-price sparklines on the focus panel and stock cards. Expanded popups have their own chart range control." />
+              </span>
+              <select value={mainChartRange} onChange={(event) => setMainChartRange(event.target.value as ChartRangeKey)}>
+                {CHART_RANGE_KEYS.map((range) => (
+                  <option key={range} value={range}>
+                    {getChartRangeLabel(range)}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <form className="add-symbol" onSubmit={addSymbol}>
@@ -182,6 +199,7 @@ export default function App() {
             {orderedQuotes.map((quote) => (
               <QuoteCard
                 cash={cash}
+                chartRange={mainChartRange}
                 isFavorite={favoritesSet.has(quote.symbol)}
                 key={quote.symbol}
                 onFavorite={() => toggleFavorite(quote.symbol)}

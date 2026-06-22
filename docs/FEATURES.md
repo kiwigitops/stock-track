@@ -8,6 +8,8 @@
 - Cash amount is shared by watch cards and paper trading.
 - Full-screen Three.js market scene responds to market direction.
 - Top-level tabs switch between Market, Paper, and About.
+- Main-page chart range controls drive real close-price sparklines on the focus panel and stock cards.
+- Main-page sparklines show actual candle dates, close range, range return, legends, and hover price readouts.
 
 ## Expanded Stock Modal
 

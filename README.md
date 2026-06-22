@@ -7,6 +7,7 @@ A dark, Apple Stocks-inspired stock tracker with live-feeling delayed quotes, fa
 - Full-bleed Three.js market scene behind the interface.
 - Set a cash amount and see how many shares it buys per symbol.
 - Add custom tickers, search the watchlist, and favorite symbols.
+- Main-page focus and card sparklines use actual loaded close candles with configurable 1M, 3M, 6M, 1Y, and 5Y ranges.
 - Open any stock card for a larger stat view with OHLC, quant metrics, candles, line, returns, technicals, risk, modelled depth, and projections.
 - Local projection signals trained in-browser from each ticker's loaded OHLC history: up probability, similar-setup expected move, holdout hit rate, feature drivers, and trend labels.
 - Configurable projection settings for forecast horizon, training window, model style, and volume usage.

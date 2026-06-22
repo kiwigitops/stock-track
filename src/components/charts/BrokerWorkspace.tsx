@@ -11,6 +11,7 @@ import {
   rollingAverage,
   standardDeviation,
 } from "../../lib/analytics";
+import { filterByChartRange, getChartRangeLabel } from "../../lib/chartRanges";
 import { formatCompact, formatPercent, formatPrice, formatRate } from "../../lib/format";
 import { getHorizonLabel, getMlSignals } from "../../lib/ml";
 import type { ChartMode, ChartRangeKey, MlSettings, RatePoint, StockCandle } from "../../types";
@@ -31,14 +32,6 @@ type LegendItem = {
 type TooltipLine = {
   label?: string;
   value: string;
-};
-
-const RANGE_LENGTHS: Record<ChartRangeKey, number> = {
-  "1m": 21,
-  "3m": 63,
-  "6m": 126,
-  "1y": 252,
-  "5y": 1260,
 };
 
 function getTooltipPosition(clientX: number, clientY: number): ChartTooltipPosition {
@@ -69,8 +62,8 @@ type BrokerWorkspaceProps = {
 
 export function BrokerWorkspace({ candles, currentRate, mlSettings, mode, range }: BrokerWorkspaceProps) {
   const allPoints = candleToRatePoints(candles);
-  const points = filterByRange(allPoints, range);
-  const visibleCandles = filterByRange(candles, range);
+  const points = filterByChartRange(allPoints, range);
+  const visibleCandles = filterByChartRange(candles, range);
 
   if (mode === "candles") return <CandleChart candles={visibleCandles} range={range} />;
   if (mode === "returns") return <ReturnsView points={points} range={range} />;
@@ -161,7 +154,7 @@ function BigChart({ points, range: chartRange }: { points: RatePoint[]; range: C
           Price
         </text>
         <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
-          {getRangeLabel(chartRange)}
+          {getChartRangeLabel(chartRange)}
         </text>
         {activePoint ? (
           <>
@@ -265,7 +258,7 @@ function CandleChart({ candles, range: chartRange }: { candles: StockCandle[]; r
           OHLC
         </text>
         <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
-          {getRangeLabel(chartRange)}
+          {getChartRangeLabel(chartRange)}
         </text>
         {coordinates.map((point) => {
           const rising = point.close >= point.open;
@@ -372,7 +365,7 @@ function ReturnsView({ points, range }: { points: RatePoint[]; range: ChartRange
             Daily %
           </text>
           <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
-            {getRangeLabel(range)}
+            {getChartRangeLabel(range)}
           </text>
           {bars.map((point) => (
             <rect
@@ -434,7 +427,7 @@ function DepthView({ currentRate, points, range }: { currentRate: number; points
           { label: "Bid model", tone: "green" },
           { label: "Ask model", tone: "red" },
         ]}
-        title={`Modeled depth from ${getRangeLabel(range)} history`}
+        title={`Modeled depth from ${getChartRangeLabel(range)} history`}
       />
       <div className="depth-book">
         <div className="depth-head">
@@ -465,7 +458,7 @@ function DepthView({ currentRate, points, range }: { currentRate: number; points
       <div className="broker-panels">
         <BrokerDatum detail="Distance between the nearest modeled bid and ask levels." label="Model spread" value={formatRate(spread)} />
         <BrokerDatum detail="Bid minus ask modeled size divided by total modeled size. Positive means the model leans bid-heavy." label="Book skew" tone={imbalance >= 0 ? "positive" : "negative"} value={formatPercent(imbalance, true)} />
-        <BrokerDatum detail={`Daily return volatility calculated from the selected ${getRangeLabel(range)} range.`} label="Vol input" value={formatPercent(volatility)} />
+        <BrokerDatum detail={`Daily return volatility calculated from the selected ${getChartRangeLabel(range)} range.`} label="Vol input" value={formatPercent(volatility)} />
       </div>
     </div>
   );
@@ -595,7 +588,7 @@ function TechnicalOverlay({ points, range: chartRange }: { points: RatePoint[]; 
           Price + averages
         </text>
         <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
-          {getRangeLabel(chartRange)}
+          {getChartRangeLabel(chartRange)}
         </text>
         <path className="technical-line price" d={pricePath} />
         <path className="technical-line sma20" d={sma20Path} />
@@ -670,7 +663,7 @@ function ProjectionView({ candles, mlSettings, range }: { candles: StockCandle[]
   const [tooltip, setTooltip] = useState<ChartTooltipPosition | null>(null);
   const ml = getMlSignals(candles, mlSettings);
   const history = ml.probabilityHistory;
-  const visibleHistory = filterByRange(history, range);
+  const visibleHistory = filterByChartRange(history, range);
 
   if (ml.status === "limited" || visibleHistory.length < 2) {
     return (
@@ -759,7 +752,7 @@ function ProjectionView({ candles, mlSettings, range }: { candles: StockCandle[]
             Up probability
           </text>
           <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
-            {getRangeLabel(range)}
+          {getChartRangeLabel(range)}
           </text>
           <path className="projection-area" d={area} />
           <path className="projection-line" d={line} />
@@ -926,7 +919,7 @@ function DrawdownChart({ points, range: chartRange }: { points: Array<{ date: st
           Drawdown
         </text>
         <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
-          {getRangeLabel(chartRange)}
+          {getChartRangeLabel(chartRange)}
         </text>
         <path className="drawdown-area" d={area} />
         <path className="drawdown-line" d={path} />
@@ -947,18 +940,6 @@ function DrawdownChart({ points, range: chartRange }: { points: Array<{ date: st
       <ChartRange end={points[points.length - 1].date} start={points[0].date} summary={`Worst ${formatPercent(min, true)}`} />
     </div>
   );
-}
-
-function filterByRange<T>(items: T[], range: ChartRangeKey) {
-  return items.slice(-RANGE_LENGTHS[range]);
-}
-
-function getRangeLabel(range: ChartRangeKey) {
-  if (range === "1m") return "1M";
-  if (range === "3m") return "3M";
-  if (range === "6m") return "6M";
-  if (range === "1y") return "1Y";
-  return "5Y";
 }
 
 function GraphHeader({ description, legend = [], title }: { description: string; legend?: LegendItem[]; title: string }) {
