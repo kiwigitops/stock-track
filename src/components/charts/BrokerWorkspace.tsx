@@ -12,8 +12,8 @@ import {
   standardDeviation,
 } from "../../lib/analytics";
 import { formatCompact, formatPercent, formatPrice, formatRate } from "../../lib/format";
-import { getMlSignals } from "../../lib/ml";
-import type { ChartMode, RatePoint, StockCandle } from "../../types";
+import { getHorizonLabel, getMlSignals } from "../../lib/ml";
+import type { ChartMode, MlSettings, RatePoint, StockCandle } from "../../types";
 
 type ChartTooltipPosition = {
   horizontal: "left" | "right";
@@ -43,10 +43,11 @@ function getTooltipClassName(position: ChartTooltipPosition) {
 type BrokerWorkspaceProps = {
   candles: StockCandle[];
   currentRate: number;
+  mlSettings: MlSettings;
   mode: ChartMode;
 };
 
-export function BrokerWorkspace({ candles, currentRate, mode }: BrokerWorkspaceProps) {
+export function BrokerWorkspace({ candles, currentRate, mlSettings, mode }: BrokerWorkspaceProps) {
   const points = candleToRatePoints(candles);
 
   if (mode === "candles") return <CandleChart candles={candles} />;
@@ -54,7 +55,7 @@ export function BrokerWorkspace({ candles, currentRate, mode }: BrokerWorkspaceP
   if (mode === "depth") return <DepthView currentRate={currentRate} points={points} />;
   if (mode === "technicals") return <TechnicalsView points={points} />;
   if (mode === "risk") return <RiskView points={points} />;
-  if (mode === "ml") return <MlView candles={candles} />;
+  if (mode === "ml") return <MlView candles={candles} mlSettings={mlSettings} />;
   return <BigChart points={points} />;
 }
 
@@ -67,12 +68,13 @@ function BigChart({ points }: { points: RatePoint[] }) {
   const width = 900;
   const height = 310;
   const pad = 22;
-  const values = points.map((point) => point.rate);
+  const visiblePoints = points.slice(-252);
+  const values = visiblePoints.map((point) => point.rate);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
-  const coordinates = points.map((point, index) => {
-    const x = pad + (index / (points.length - 1)) * (width - pad * 2);
+  const coordinates = visiblePoints.map((point, index) => {
+    const x = pad + (index / (visiblePoints.length - 1)) * (width - pad * 2);
     const y = pad + (1 - (point.rate - min) / range) * (height - pad * 2);
     return { ...point, x, y };
   });
@@ -141,7 +143,7 @@ function BigChart({ points }: { points: RatePoint[] }) {
           <strong>{formatPrice(activePoint.rate)}</strong>
         </div>
       ) : null}
-      <ChartRange end={points[points.length - 1].date} max={max} min={min} start={points[0].date} />
+      <ChartRange end={visiblePoints[visiblePoints.length - 1].date} max={max} min={min} start={visiblePoints[0].date} />
     </div>
   );
 }
@@ -445,8 +447,8 @@ function RiskView({ points }: { points: RatePoint[] }) {
   );
 }
 
-function MlView({ candles }: { candles: StockCandle[] }) {
-  const ml = getMlSignals(candles);
+function MlView({ candles, mlSettings }: { candles: StockCandle[]; mlSettings: MlSettings }) {
+  const ml = getMlSignals(candles, mlSettings);
   const history = ml.probabilityHistory;
 
   if (ml.status === "limited" || history.length < 2) {
@@ -487,12 +489,31 @@ function MlView({ candles }: { candles: StockCandle[] }) {
         <path className="ml-line" d={line} />
       </svg>
       <div className="broker-panels technical-grid">
-        <BrokerDatum label="Up prob" tone={ml.probabilityUp >= 0.5 ? "positive" : "negative"} value={formatPercent(ml.probabilityUp)} />
-        <BrokerDatum label="Expected" tone={ml.expectedMove >= 0 ? "positive" : "negative"} value={formatPercent(ml.expectedMove, true)} />
-        <BrokerDatum label="Confidence" value={formatPercent(ml.confidence)} />
-        <BrokerDatum label="Holdout hit" value={formatPercent(ml.testAccuracy)} />
-        <BrokerDatum label="Samples" value={formatCompact(ml.sampleSize, 0)} />
-        <BrokerDatum label="Regime" value={ml.regime} />
+        <BrokerDatum
+          detail="Probability that the selected horizon closes above the latest close, from the local logistic classifier."
+          label={`${getHorizonLabel(ml.horizon)} up`}
+          tone={ml.probabilityUp >= 0.5 ? "positive" : "negative"}
+          value={formatPercent(ml.probabilityUp)}
+        />
+        <BrokerDatum
+          detail="Average forward return from the nearest historical setups under the current model settings."
+          label="Expected"
+          tone={ml.expectedMove >= 0 ? "positive" : "negative"}
+          value={formatPercent(ml.expectedMove, true)}
+        />
+        <BrokerDatum detail="Blend of non-neutral probability and holdout hit rate." label="Confidence" value={formatPercent(ml.confidence)} />
+        <BrokerDatum detail="Chronological validation accuracy on the final quarter of samples." label="Holdout hit" value={formatPercent(ml.testAccuracy)} />
+        <BrokerDatum detail="Label from trend stack, momentum, RSI, and drawdown." label="Trend" value={ml.trend.label} />
+        <BrokerDatum detail="Volatility and probability regime for the selected horizon." label="Regime" value={ml.regime} />
+      </div>
+      <div className="forecast-strip" aria-label="ML forward horizons">
+        {ml.forecasts.map((forecast) => (
+          <div className={forecast.expectedMove >= 0 ? "forecast-card positive" : "forecast-card negative"} key={forecast.horizon}>
+            <span>{getHorizonLabel(forecast.horizon)}</span>
+            <strong>{formatPercent(forecast.expectedMove, true)}</strong>
+            <em>{formatPercent(forecast.probabilityUp)} up</em>
+          </div>
+        ))}
       </div>
       <div className="feature-stack" aria-label="ML feature contributions">
         {ml.features.slice(0, 6).map((feature) => (
@@ -502,6 +523,15 @@ function MlView({ candles }: { candles: StockCandle[] }) {
               <em style={{ width: `${(Math.abs(feature.contribution) / maxContribution) * 100}%` }} />
             </div>
             <strong>{formatCompact(feature.contribution, 3)}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="trend-stack" aria-label="Trend components">
+        {ml.trend.components.map((component) => (
+          <div className={component.score >= 0 ? "trend-row positive" : "trend-row negative"} key={component.label}>
+            <span>{component.label}</span>
+            <strong>{component.value}</strong>
+            <em>{formatCompact(component.score, 2)}</em>
           </div>
         ))}
       </div>
@@ -554,10 +584,27 @@ function ChartFallback({ label }: { label: string }) {
   );
 }
 
-function BrokerDatum({ label, tone = "", value }: { label: string; tone?: "positive" | "negative" | ""; value: string }) {
+function BrokerDatum({
+  detail,
+  label,
+  tone = "",
+  value,
+}: {
+  detail?: string;
+  label: string;
+  tone?: "positive" | "negative" | "";
+  value: string;
+}) {
   return (
     <div className={tone ? `broker-datum ${tone}` : "broker-datum"}>
-      <span>{label}</span>
+      <span>
+        {label}
+        {detail ? (
+          <span className="mini-info" title={detail}>
+            i
+          </span>
+        ) : null}
+      </span>
       <strong>{value}</strong>
     </div>
   );

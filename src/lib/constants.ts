@@ -31,3 +31,11 @@ export const WATCHLIST = [
 export const CASH_KEY = "stocktrack:cash";
 export const FAVORITES_KEY = "stocktrack:favorites";
 export const SYMBOLS_KEY = "stocktrack:symbols";
+export const ML_SETTINGS_KEY = "stocktrack:ml-settings";
+
+export const DEFAULT_ML_SETTINGS = {
+  horizon: 21,
+  includeVolume: true,
+  modelStyle: "balanced",
+  trainingWindow: 756,
+} as const;

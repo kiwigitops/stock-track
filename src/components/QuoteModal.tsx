@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Gauge, LineChart, Star, X } from "lucide-react";
 import { candleToRatePoints, getStats } from "../lib/analytics";
+import { DEFAULT_ML_SETTINGS, ML_SETTINGS_KEY } from "../lib/constants";
 import { formatCompact, formatMoney, formatPercent, formatPrice, formatRate, venueName } from "../lib/format";
-import { getMlSignals } from "../lib/ml";
-import type { ChartMode, StockQuote } from "../types";
+import { getHorizonLabel, getMlSignals } from "../lib/ml";
+import { usePersistentState } from "../hooks/usePersistentState";
+import type { ChartMode, MlHorizon, MlModelStyle, MlSettings, MlTrainingWindow, StockQuote } from "../types";
 import { InfoTip } from "./InfoTip";
 import { BrokerWorkspace } from "./charts/BrokerWorkspace";
 
@@ -19,6 +21,7 @@ const chartModes: ChartMode[] = ["candles", "line", "returns", "technicals", "ri
 
 export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: QuoteModalProps) {
   const [chartMode, setChartMode] = useState<ChartMode>("candles");
+  const [mlSettings, setMlSettings] = usePersistentState<MlSettings>(ML_SETTINGS_KEY, DEFAULT_ML_SETTINGS);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -29,9 +32,14 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
   }, [onClose]);
 
   const ratePoints = useMemo(() => candleToRatePoints(quote.candles), [quote.candles]);
-  const stats = useMemo(() => getStats(ratePoints, quote.price), [quote.price, ratePoints]);
-  const ml = useMemo(() => getMlSignals(quote.candles), [quote.candles]);
+  const visibleRatePoints = useMemo(() => ratePoints.slice(-252), [ratePoints]);
+  const stats = useMemo(() => getStats(visibleRatePoints, quote.price), [quote.price, visibleRatePoints]);
+  const ml = useMemo(() => getMlSignals(quote.candles, mlSettings), [mlSettings, quote.candles]);
   const shares = quote.price ? cash / quote.price : 0;
+
+  function updateMlSettings(next: Partial<MlSettings>) {
+    setMlSettings((current) => ({ ...current, ...next }));
+  }
 
   return (
     <div className="modal-layer" onClick={onClose}>
@@ -83,7 +91,7 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
           </div>
           <div className="quant-grid">
             <ModalStat
-              detail="Percent change from the first loaded candle close to the latest loaded close."
+              detail="Percent change from the first close in the visible one-year window to the latest close."
               label="1Y return"
               tone={stats.periodReturn >= 0 ? "positive" : "negative"}
               value={formatPercent(stats.periodReturn, true)}
@@ -119,10 +127,63 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
             <span>ML signals</span>
             <InfoTip text="A tiny local model trains on this symbol's loaded daily candles. It is a pattern signal, not investment advice or a real prediction engine." />
           </div>
+          <div className="ml-settings">
+            <label>
+              <span>
+                Horizon
+                <InfoTip text="How far forward the classifier labels each historical setup. 1D means next session; 1Y means roughly 252 trading sessions forward." />
+              </span>
+              <select value={mlSettings.horizon} onChange={(event) => updateMlSettings({ horizon: Number(event.target.value) as MlHorizon })}>
+                <option value={1}>1D</option>
+                <option value={5}>1W</option>
+                <option value={21}>1M</option>
+                <option value={63}>3M</option>
+                <option value={126}>6M</option>
+                <option value={252}>1Y</option>
+              </select>
+            </label>
+            <label>
+              <span>
+                Training
+                <InfoTip text="How many recent daily candles the model is allowed to learn from. Larger windows are steadier; smaller windows adapt faster." />
+              </span>
+              <select
+                value={mlSettings.trainingWindow}
+                onChange={(event) => updateMlSettings({ trainingWindow: Number(event.target.value) as MlTrainingWindow })}
+              >
+                <option value={252}>1Y</option>
+                <option value={504}>2Y</option>
+                <option value={756}>3Y</option>
+                <option value={1260}>5Y</option>
+              </select>
+            </label>
+            <label>
+              <span>
+                Bias
+                <InfoTip text="Model style changes the initial prior and feature transform. Balanced is neutral; Momentum favors trend-following; Reversion favors stretched-price snapback." />
+              </span>
+              <select value={mlSettings.modelStyle} onChange={(event) => updateMlSettings({ modelStyle: event.target.value as MlModelStyle })}>
+                <option value="balanced">Balanced</option>
+                <option value="momentum">Momentum</option>
+                <option value="meanReversion">Reversion</option>
+              </select>
+            </label>
+            <label className="toggle-row">
+              <span>
+                Volume
+                <InfoTip text="Includes or removes the volume z-score feature. Turn it off when you want price-only pattern analysis." />
+              </span>
+              <input
+                checked={mlSettings.includeVolume}
+                onChange={(event) => updateMlSettings({ includeVolume: event.target.checked })}
+                type="checkbox"
+              />
+            </label>
+          </div>
           <div className="quant-grid">
             <ModalStat
-              detail="Logistic classifier probability that the next loaded-style daily candle closes higher than the latest close."
-              label="Up prob"
+              detail="Logistic classifier probability that the selected forecast horizon closes higher than the latest close."
+              label={`${getHorizonLabel(ml.horizon)} up`}
               tone={ml.probabilityUp >= 0.5 ? "positive" : "negative"}
               value={formatPercent(ml.probabilityUp)}
             />
@@ -143,7 +204,19 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
               value={ml.testAccuracy ? formatPercent(ml.testAccuracy) : "n/a"}
             />
             <ModalStat detail="Current model regime inferred from probability, volatility, and similar-setup expected move." label="Regime" value={ml.regime} />
-            <ModalStat detail="Largest signed feature contribution in the local logistic model." label="Driver" value={ml.topDriver} />
+            <ModalStat detail="Trend score from moving-average stack, 20D/50D momentum, RSI, and drawdown from the trailing one-year high." label="Trend" value={ml.trend.label} />
+          </div>
+          <div className="forecast-grid" aria-label="Forward forecast curve">
+            {ml.forecasts.map((forecast) => (
+              <div className={forecast.expectedMove >= 0 ? "forecast-card positive" : "forecast-card negative"} key={forecast.horizon}>
+                <span>
+                  {getHorizonLabel(forecast.horizon)}
+                  <InfoTip text="Each card retrains the same local model for this forecast horizon and averages the forward return from the closest historical setups." />
+                </span>
+                <strong>{formatPercent(forecast.expectedMove, true)}</strong>
+                <em>{formatPercent(forecast.probabilityUp)} up</em>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -186,7 +259,7 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
             ))}
           </div>
           {quote.candles.length ? (
-            <BrokerWorkspace currentRate={quote.price} mode={chartMode} candles={quote.candles} />
+            <BrokerWorkspace currentRate={quote.price} mode={chartMode} candles={quote.candles} mlSettings={mlSettings} />
           ) : (
             <div className="chart-fallback">
               <BarChart3 size={28} />

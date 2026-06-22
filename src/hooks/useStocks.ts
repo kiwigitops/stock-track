@@ -9,7 +9,7 @@ type CachedQuote = {
   receivedAt: number;
 };
 
-const CACHE_PREFIX = "stocktrack:v2:quote:";
+const CACHE_PREFIX = "stocktrack:v3:quote:";
 const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
 const STALE_AFTER_MS = 10 * 60 * 1000;
 

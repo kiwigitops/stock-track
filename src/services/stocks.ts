@@ -46,7 +46,7 @@ type YahooQuoteBlock = {
 const CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const CORS_PROXY = "https://corsproxy.io/?";
 
-export async function fetchStock(symbol: string, signal?: AbortSignal, range = "1y"): Promise<StockQuote> {
+export async function fetchStock(symbol: string, signal?: AbortSignal, range = "5y"): Promise<StockQuote> {
   const cleanSymbol = normalizeSymbol(symbol);
   if (!cleanSymbol) throw new Error("Symbol is required");
 

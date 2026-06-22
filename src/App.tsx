@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { Gauge, LoaderCircle, Plus, RefreshCcw, Search, Star } from "lucide-react";
 import MarketScene from "./MarketScene";
 import { FocusStage } from "./components/FocusStage";
+import { PaperTradeDesk } from "./components/PaperTradeDesk";
 import { QuoteCard } from "./components/QuoteCard";
 import { QuoteModal } from "./components/QuoteModal";
 import { usePersistentState } from "./hooks/usePersistentState";
@@ -18,6 +19,7 @@ export default function App() {
   const [newSymbol, setNewSymbol] = useState("");
   const [selected, setSelected] = useState<StockQuote | null>(null);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [activeView, setActiveView] = useState<"market" | "paper">("market");
 
   const symbols = useMemo(() => {
     return Array.from(new Set([...favorites, ...WATCHLIST, ...customSymbols].map(normalizeSymbol).filter(Boolean)));
@@ -92,46 +94,57 @@ export default function App() {
           <FocusStage cash={cash} headline={headline} onOpen={setSelected} quotes={focusQuotes} />
         </header>
 
-        <section className="quote-controls stock-controls" aria-label="Stock controls">
-          <label>
-            <span>Cash</span>
-            <input
-              inputMode="decimal"
-              min="0"
-              onChange={(event) => setCash(Math.max(0, Number(event.target.value) || 0))}
-              type="number"
-              value={cash}
-            />
-          </label>
+        <div className="app-tabs" aria-label="Workspace views">
+          <button className={activeView === "market" ? "active" : ""} onClick={() => setActiveView("market")}>
+            Market
+          </button>
+          <button className={activeView === "paper" ? "active" : ""} onClick={() => setActiveView("paper")}>
+            Paper
+          </button>
+        </div>
 
-          <form className="add-symbol" onSubmit={addSymbol}>
+        {activeView === "market" ? (
+          <section className="quote-controls stock-controls" aria-label="Stock controls">
             <label>
-              <span>Add symbol</span>
+              <span>Cash</span>
+              <input
+                inputMode="decimal"
+                min="0"
+                onChange={(event) => setCash(Math.max(0, Number(event.target.value) || 0))}
+                type="number"
+                value={cash}
+              />
+            </label>
+
+            <form className="add-symbol" onSubmit={addSymbol}>
+              <label>
+                <span>Add symbol</span>
+                <div>
+                  <Plus size={16} />
+                  <input
+                    autoCapitalize="characters"
+                    onChange={(event) => setNewSymbol(event.target.value.toUpperCase())}
+                    placeholder="AAPL"
+                    value={newSymbol}
+                  />
+                </div>
+              </label>
+            </form>
+
+            <label className="search-field">
+              <span>Search</span>
               <div>
-                <Plus size={16} />
-                <input
-                  autoCapitalize="characters"
-                  onChange={(event) => setNewSymbol(event.target.value.toUpperCase())}
-                  placeholder="AAPL"
-                  value={newSymbol}
-                />
+                <Search size={16} />
+                <input onChange={(event) => setQuery(event.target.value)} placeholder="Search symbol" type="search" value={query} />
               </div>
             </label>
-          </form>
 
-          <label className="search-field">
-            <span>Search</span>
-            <div>
-              <Search size={16} />
-              <input onChange={(event) => setQuery(event.target.value)} placeholder="Search symbol" type="search" value={query} />
-            </div>
-          </label>
-
-          <button className={onlyFavorites ? "pill-button active" : "pill-button"} onClick={() => setOnlyFavorites((value) => !value)}>
-            <Star size={16} />
-            Favorites
-          </button>
-        </section>
+            <button className={onlyFavorites ? "pill-button active" : "pill-button"} onClick={() => setOnlyFavorites((value) => !value)}>
+              <Star size={16} />
+              Favorites
+            </button>
+          </section>
+        ) : null}
 
         {error ? (
           <section className="market-state" role="alert">
@@ -141,7 +154,9 @@ export default function App() {
           </section>
         ) : null}
 
-        {loading && !quotes.length ? (
+        {activeView === "paper" ? (
+          <PaperTradeDesk cash={cash} onCashChange={setCash} quotes={quotes} />
+        ) : loading && !quotes.length ? (
           <section className="market-state large">
             <LoaderCircle className="spin" size={26} />
             <strong>Opening market</strong>

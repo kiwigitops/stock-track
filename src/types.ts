@@ -34,3 +34,16 @@ export type StockQuote = {
 export type ChartMode = "candles" | "line" | "returns" | "technicals" | "risk" | "depth" | "ml";
 
 export type StockTile = StockQuote;
+
+export type MlHorizon = 1 | 5 | 21 | 63 | 126 | 252;
+
+export type MlModelStyle = "balanced" | "momentum" | "meanReversion";
+
+export type MlTrainingWindow = 252 | 504 | 756 | 1260;
+
+export type MlSettings = {
+  horizon: MlHorizon;
+  includeVolume: boolean;
+  modelStyle: MlModelStyle;
+  trainingWindow: MlTrainingWindow;
+};
