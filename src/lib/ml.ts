@@ -139,7 +139,7 @@ function trainForHorizon(records: FeatureRecord[], currentFeatures: number[], se
     confidence,
     expectedMove,
     features,
-    probabilityHistory: records.slice(-120).map((record) => ({
+    probabilityHistory: records.map((record) => ({
       date: record.date,
       nextReturn: record.nextReturn,
       probabilityUp: clamp(sigmoid(finalModel.bias + dot(finalModel.weights, standardize(record.features, finalModel))), 0.05, 0.95),

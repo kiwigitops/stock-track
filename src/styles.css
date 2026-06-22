@@ -239,7 +239,6 @@ em {
 .focus-panel,
 .focus-rail,
 .quote-card,
-.quote-modal,
 .quote-controls {
   transform: translateZ(0);
 }
@@ -984,6 +983,12 @@ select option {
   }
 }
 
+@keyframes tooltip-pop {
+  from {
+    opacity: 0;
+  }
+}
+
 .modal-layer {
   position: fixed;
   inset: 0;
@@ -1230,6 +1235,7 @@ select option {
 .info-tip {
   position: relative;
   display: inline-grid;
+  flex: 0 0 auto;
   width: 18px;
   height: 18px;
   place-items: center;
@@ -1247,8 +1253,10 @@ select option {
 
 .floating-info-tooltip {
   position: fixed;
-  z-index: 6;
+  z-index: 80;
   width: min(280px, calc(100vw - 40px));
+  max-height: min(220px, calc(100vh - 24px));
+  overflow: auto;
   padding: 10px 11px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-panel);
@@ -1262,10 +1270,11 @@ select option {
   pointer-events: none;
   text-transform: none;
   transform: translateX(-50%);
+  animation: tooltip-pop var(--motion-fast) var(--ease-out);
 }
 
 .floating-info-tooltip.above {
-  transform: translate(-50%, -100%);
+  transform: translateX(-50%);
 }
 
 .deep-chart {
@@ -1317,6 +1326,117 @@ select option {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.chart-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  margin: calc(var(--space-2) * -1) 0 var(--space-4);
+}
+
+.chart-toolbar > span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: rgba(245, 247, 251, 0.58);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.range-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, 44px);
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-panel);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.range-tabs button {
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  color: rgba(245, 247, 251, 0.58);
+  background: transparent;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.range-tabs button.active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.graph-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-panel);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.graph-title strong,
+.setup-head strong {
+  display: block;
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.graph-title span {
+  display: block;
+  margin-top: 3px;
+  color: rgba(245, 247, 251, 0.6);
+  font-size: 0.78rem;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.graph-legend {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(245, 247, 251, 0.62);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.legend-item::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(245, 247, 251, 0.5);
+  content: "";
+}
+
+.legend-item.green::before {
+  background: #31d158;
+}
+
+.legend-item.red::before {
+  background: #ff453a;
+}
+
+.legend-item.blue::before {
+  background: #64d2ff;
+}
+
+.legend-item.yellow::before {
+  background: #ffd60a;
+}
+
 .interactive-chart {
   position: relative;
   touch-action: none;
@@ -1360,6 +1480,14 @@ select option {
   stroke: rgba(245, 247, 251, 0.2);
 }
 
+.axis-label {
+  fill: rgba(245, 247, 251, 0.46);
+  font-size: 12px;
+  font-weight: 850;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
 .candle line {
   stroke: currentColor;
   stroke-linecap: round;
@@ -1389,7 +1517,9 @@ select option {
 .depth-view,
 .technicals-view,
 .risk-view,
-.ml-view {
+.line-view,
+.candle-view,
+.projection-view {
   display: grid;
   gap: var(--space-3);
 }
@@ -1446,17 +1576,18 @@ select option {
   fill: #ff453a;
 }
 
-.ml-chart {
+.projection-chart {
   display: block;
   width: 100%;
   height: 260px;
+  cursor: crosshair;
 }
 
-.ml-area {
-  fill: url(#mlFill);
+.projection-area {
+  fill: url(#projectionFill);
 }
 
-.ml-line {
+.projection-line {
   fill: none;
   stroke: #64d2ff;
   stroke-linecap: round;
@@ -1480,12 +1611,19 @@ select option {
   align-items: center;
 }
 
-.feature-row span,
+.feature-row > span,
 .feature-row strong {
   color: rgba(245, 247, 251, 0.66);
   font-size: 0.78rem;
   font-weight: 850;
   text-transform: uppercase;
+}
+
+.feature-row > span,
+.trend-row span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .feature-row strong {
@@ -1556,6 +1694,56 @@ select option {
   color: #ff453a;
 }
 
+.setup-stack {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-panel);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.setup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.setup-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px 110px;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.setup-row span,
+.setup-row em {
+  color: rgba(245, 247, 251, 0.58);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.setup-row strong {
+  color: #ffffff;
+  text-align: right;
+}
+
+.setup-row em {
+  text-align: right;
+}
+
+.positive-text {
+  color: #31d158 !important;
+}
+
+.negative-text {
+  color: #ff453a !important;
+}
+
 .broker-panels {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1574,6 +1762,27 @@ select option {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.metric-card,
+.forecast-card,
+.broker-datum,
+.trend-row,
+.setup-row,
+.hover-data-row {
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    background var(--motion-fast) var(--ease-out);
+}
+
+.metric-card:hover,
+.forecast-card:hover,
+.broker-datum:hover,
+.trend-row:hover,
+.setup-row:hover,
+.hover-data-row:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.075);
+}
+
 .broker-datum span {
   display: flex;
   align-items: center;
@@ -1582,19 +1791,6 @@ select option {
   font-size: 0.72rem;
   font-weight: 850;
   text-transform: uppercase;
-}
-
-.mini-info {
-  display: inline-grid;
-  width: 15px;
-  height: 15px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  color: rgba(245, 247, 251, 0.62);
-  font-size: 0.62rem;
-  line-height: 1;
-  text-transform: none;
 }
 
 .broker-datum strong {
@@ -1713,6 +1909,7 @@ select option {
   box-shadow: 0 18px 46px rgba(0, 0, 0, 0.35);
   pointer-events: none;
   transform: translate(12px, -112%);
+  animation: tooltip-pop var(--motion-fast) var(--ease-out);
 }
 
 .chart-tooltip.left {
@@ -1750,6 +1947,27 @@ select option {
 .chart-tooltip strong {
   margin-top: 2px;
   font-size: 1.1rem;
+}
+
+.chart-tooltip .tooltip-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-3);
+  min-width: 186px;
+  margin-top: 4px;
+}
+
+.chart-tooltip em {
+  color: rgba(245, 247, 251, 0.6);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.chart-tooltip .tooltip-line strong {
+  margin-top: 0;
+  font-size: 0.82rem;
 }
 
 .chart-range {
@@ -1816,6 +2034,16 @@ select option {
 
   .paper-layout {
     grid-template-columns: 1fr;
+  }
+
+  .chart-toolbar,
+  .graph-header {
+    grid-template-columns: 1fr;
+  }
+
+  .range-tabs {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    width: 100%;
   }
 }
 
@@ -1892,6 +2120,17 @@ select option {
 
   .chart-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-toolbar,
+  .graph-header,
+  .setup-row {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-row strong,
+  .setup-row em {
+    text-align: left;
   }
 
   .app-tabs {

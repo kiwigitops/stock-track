@@ -5,7 +5,7 @@ import { DEFAULT_ML_SETTINGS, ML_SETTINGS_KEY } from "../lib/constants";
 import { formatCompact, formatMoney, formatPercent, formatPrice, formatRate, venueName } from "../lib/format";
 import { getHorizonLabel, getMlSignals } from "../lib/ml";
 import { usePersistentState } from "../hooks/usePersistentState";
-import type { ChartMode, MlHorizon, MlModelStyle, MlSettings, MlTrainingWindow, StockQuote } from "../types";
+import type { ChartMode, ChartRangeKey, MlHorizon, MlModelStyle, MlSettings, MlTrainingWindow, StockQuote } from "../types";
 import { InfoTip } from "./InfoTip";
 import { BrokerWorkspace } from "./charts/BrokerWorkspace";
 
@@ -17,10 +17,12 @@ type QuoteModalProps = {
   quote: StockQuote;
 };
 
-const chartModes: ChartMode[] = ["candles", "line", "returns", "technicals", "risk", "depth", "ml"];
+const chartModes: ChartMode[] = ["candles", "line", "returns", "technicals", "risk", "depth", "projections"];
+const chartRanges: ChartRangeKey[] = ["1m", "3m", "6m", "1y", "5y"];
 
 export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: QuoteModalProps) {
   const [chartMode, setChartMode] = useState<ChartMode>("candles");
+  const [chartRange, setChartRange] = useState<ChartRangeKey>("1y");
   const [mlSettings, setMlSettings] = usePersistentState<MlSettings>(ML_SETTINGS_KEY, DEFAULT_ML_SETTINGS);
 
   useEffect(() => {
@@ -122,16 +124,16 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
           </div>
         </section>
 
-        <section className="quant-panel ml-panel" aria-label="ML signals">
+        <section className="quant-panel ml-panel" aria-label="Projection signals">
           <div className="panel-heading">
-            <span>ML signals</span>
-            <InfoTip text="A tiny local model trains on this symbol's loaded daily candles. It is a pattern signal, not investment advice or a real prediction engine." />
+            <span>Projection settings</span>
+            <InfoTip text="These projections come from a small local model trained only on this symbol's loaded daily candles. Treat it as an explainable pattern read, not financial advice." />
           </div>
           <div className="ml-settings">
             <label>
               <span>
                 Horizon
-                <InfoTip text="How far forward the classifier labels each historical setup. 1D means next session; 1Y means roughly 252 trading sessions forward." />
+                <InfoTip text="How far forward each historical setup is judged. 1D means next session; 1Y means roughly 252 trading sessions forward." />
               </span>
               <select value={mlSettings.horizon} onChange={(event) => updateMlSettings({ horizon: Number(event.target.value) as MlHorizon })}>
                 <option value={1}>1D</option>
@@ -160,7 +162,7 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
             <label>
               <span>
                 Bias
-                <InfoTip text="Model style changes the initial prior and feature transform. Balanced is neutral; Momentum favors trend-following; Reversion favors stretched-price snapback." />
+                <InfoTip text="Changes how the local model treats signals before training. Balanced is neutral; Momentum leans toward trend-following; Reversion leans toward stretched-price snapback." />
               </span>
               <select value={mlSettings.modelStyle} onChange={(event) => updateMlSettings({ modelStyle: event.target.value as MlModelStyle })}>
                 <option value="balanced">Balanced</option>
@@ -182,13 +184,13 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
           </div>
           <div className="quant-grid">
             <ModalStat
-              detail="Logistic classifier probability that the selected forecast horizon closes higher than the latest close."
+              detail="Estimated probability that the selected forecast horizon closes higher than the latest close, using the current projection settings."
               label={`${getHorizonLabel(ml.horizon)} up`}
               tone={ml.probabilityUp >= 0.5 ? "positive" : "negative"}
               value={formatPercent(ml.probabilityUp)}
             />
             <ModalStat
-              detail="Average next-day return from the most similar historical feature setups in this symbol's candle history."
+              detail="Average forward return from the closest historical setups under the selected projection horizon."
               label="Expected"
               tone={ml.expectedMove >= 0 ? "positive" : "negative"}
               value={formatPercent(ml.expectedMove, true)}
@@ -203,7 +205,7 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
               label="Holdout hit"
               value={ml.testAccuracy ? formatPercent(ml.testAccuracy) : "n/a"}
             />
-            <ModalStat detail="Current model regime inferred from probability, volatility, and similar-setup expected move." label="Regime" value={ml.regime} />
+            <ModalStat detail="Current projection regime inferred from probability, volatility, and similar-setup expected move." label="Regime" value={ml.regime} />
             <ModalStat detail="Trend score from moving-average stack, 20D/50D momentum, RSI, and drawdown from the trailing one-year high." label="Trend" value={ml.trend.label} />
           </div>
           <div className="forecast-grid" aria-label="Forward forecast curve">
@@ -211,7 +213,7 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
               <div className={forecast.expectedMove >= 0 ? "forecast-card positive" : "forecast-card negative"} key={forecast.horizon}>
                 <span>
                   {getHorizonLabel(forecast.horizon)}
-                  <InfoTip text="Each card retrains the same local model for this forecast horizon and averages the forward return from the closest historical setups." />
+                  <InfoTip text="Each card retrains the same local projection model for this horizon and averages the forward return from the closest historical setups." />
                 </span>
                 <strong>{formatPercent(forecast.expectedMove, true)}</strong>
                 <em>{formatPercent(forecast.probabilityUp)} up</em>
@@ -226,40 +228,39 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
           <DatasetCard detail="Stats, volatility, drawdown, percentile, z-score, technicals, and risk views are calculated locally from loaded candles." label="Derived" value="Local" />
           <DatasetCard detail="Candles use actual daily OHLC values from the chart feed when available." label="Candles" value="Daily OHLC" />
           <DatasetCard detail="Depth view is a broker-style liquidity model from price, volatility, and momentum. It is not a live order book." label="Depth" value="Modelled" />
-          <DatasetCard detail="ML signals are trained locally from this ticker's loaded candles using logistic classification and similar-pattern averaging." label="ML" value={ml.status === "ready" ? "Local model" : "Needs data"} />
+          <DatasetCard detail="Projection signals are trained locally from this ticker's loaded candles using logistic classification and similar-pattern averaging." label="Projections" value={ml.status === "ready" ? "Local model" : "Needs data"} />
         </section>
 
         <section className="deep-chart">
           <div className="chart-title">
             {chartMode === "depth" ? <Gauge size={18} /> : <LineChart size={18} />}
             <div>
-              <strong>{chartMode === "depth" ? "Market depth" : chartMode === "ml" ? "ML signal" : "1Y chart"}</strong>
-              <span>
-                {quote.symbol}/{quote.currency}
-              </span>
+              <strong>{getChartModeLabel(chartMode)}</strong>
+              <span>{getChartModeDescription(chartMode, quote.symbol, quote.currency)}</span>
             </div>
           </div>
           <div className="chart-tabs" aria-label="Broker chart views">
             {chartModes.map((mode) => (
               <button className={chartMode === mode ? "active" : ""} key={mode} onClick={() => setChartMode(mode)} type="button">
-                {mode === "candles"
-                  ? "Candles"
-                  : mode === "line"
-                    ? "Line"
-                    : mode === "returns"
-                      ? "Returns"
-                      : mode === "technicals"
-                        ? "Technicals"
-                        : mode === "risk"
-                          ? "Risk"
-                          : mode === "depth"
-                            ? "Depth"
-                            : "ML"}
+                {getChartModeLabel(mode)}
               </button>
             ))}
           </div>
+          <div className="chart-toolbar">
+            <span>
+              Visible range
+              <InfoTip text="This filter changes the visible history in every chart and data view. Projection training still follows the training-window setting above; this controls the chart view." />
+            </span>
+            <div className="range-tabs" aria-label="Visible chart range">
+              {chartRanges.map((range) => (
+                <button className={chartRange === range ? "active" : ""} key={range} onClick={() => setChartRange(range)} type="button">
+                  {getChartRangeLabel(range)}
+                </button>
+              ))}
+            </div>
+          </div>
           {quote.candles.length ? (
-            <BrokerWorkspace currentRate={quote.price} mode={chartMode} candles={quote.candles} mlSettings={mlSettings} />
+            <BrokerWorkspace currentRate={quote.price} mode={chartMode} range={chartRange} candles={quote.candles} mlSettings={mlSettings} />
           ) : (
             <div className="chart-fallback">
               <BarChart3 size={28} />
@@ -270,6 +271,34 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
       </section>
     </div>
   );
+}
+
+function getChartModeLabel(mode: ChartMode) {
+  if (mode === "candles") return "Candles";
+  if (mode === "line") return "Line";
+  if (mode === "returns") return "Returns";
+  if (mode === "technicals") return "Technicals";
+  if (mode === "risk") return "Risk";
+  if (mode === "depth") return "Depth";
+  return "Projections";
+}
+
+function getChartModeDescription(mode: ChartMode, symbol: string, currency: string) {
+  if (mode === "candles") return `${symbol}/${currency} open, high, low, and close for the selected range.`;
+  if (mode === "line") return `${symbol}/${currency} closing price path for the selected range.`;
+  if (mode === "returns") return "Daily percentage changes for individual sessions.";
+  if (mode === "technicals") return "Price with moving averages plus trend indicators for the selected range.";
+  if (mode === "risk") return "Drawdown, volatility, and downside-risk measures from the selected range.";
+  if (mode === "depth") return "A modeled broker-style book derived from price, volatility, and momentum.";
+  return "Forward projection probabilities, expected moves, drivers, and trend stack.";
+}
+
+function getChartRangeLabel(range: ChartRangeKey) {
+  if (range === "1m") return "1M";
+  if (range === "3m") return "3M";
+  if (range === "6m") return "6M";
+  if (range === "1y") return "1Y";
+  return "5Y";
 }
 
 function ModalStat({

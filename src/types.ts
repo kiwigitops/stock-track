@@ -31,7 +31,9 @@ export type StockQuote = {
   volume: number;
 };
 
-export type ChartMode = "candles" | "line" | "returns" | "technicals" | "risk" | "depth" | "ml";
+export type ChartMode = "candles" | "line" | "returns" | "technicals" | "risk" | "depth" | "projections";
+
+export type ChartRangeKey = "1m" | "3m" | "6m" | "1y" | "5y";
 
 export type StockTile = StockQuote;
 

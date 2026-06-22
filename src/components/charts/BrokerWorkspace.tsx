@@ -13,13 +13,32 @@ import {
 } from "../../lib/analytics";
 import { formatCompact, formatPercent, formatPrice, formatRate } from "../../lib/format";
 import { getHorizonLabel, getMlSignals } from "../../lib/ml";
-import type { ChartMode, MlSettings, RatePoint, StockCandle } from "../../types";
+import type { ChartMode, ChartRangeKey, MlSettings, RatePoint, StockCandle } from "../../types";
+import { InfoTip } from "../InfoTip";
 
 type ChartTooltipPosition = {
   horizontal: "left" | "right";
   left: number;
   placement: "above" | "below";
   top: number;
+};
+
+type LegendItem = {
+  label: string;
+  tone?: "blue" | "green" | "red" | "yellow";
+};
+
+type TooltipLine = {
+  label?: string;
+  value: string;
+};
+
+const RANGE_LENGTHS: Record<ChartRangeKey, number> = {
+  "1m": 21,
+  "3m": 63,
+  "6m": 126,
+  "1y": 252,
+  "5y": 1260,
 };
 
 function getTooltipPosition(clientX: number, clientY: number): ChartTooltipPosition {
@@ -45,21 +64,24 @@ type BrokerWorkspaceProps = {
   currentRate: number;
   mlSettings: MlSettings;
   mode: ChartMode;
+  range: ChartRangeKey;
 };
 
-export function BrokerWorkspace({ candles, currentRate, mlSettings, mode }: BrokerWorkspaceProps) {
-  const points = candleToRatePoints(candles);
+export function BrokerWorkspace({ candles, currentRate, mlSettings, mode, range }: BrokerWorkspaceProps) {
+  const allPoints = candleToRatePoints(candles);
+  const points = filterByRange(allPoints, range);
+  const visibleCandles = filterByRange(candles, range);
 
-  if (mode === "candles") return <CandleChart candles={candles} />;
-  if (mode === "returns") return <ReturnsView points={points} />;
-  if (mode === "depth") return <DepthView currentRate={currentRate} points={points} />;
-  if (mode === "technicals") return <TechnicalsView points={points} />;
-  if (mode === "risk") return <RiskView points={points} />;
-  if (mode === "ml") return <MlView candles={candles} mlSettings={mlSettings} />;
-  return <BigChart points={points} />;
+  if (mode === "candles") return <CandleChart candles={visibleCandles} range={range} />;
+  if (mode === "returns") return <ReturnsView points={points} range={range} />;
+  if (mode === "depth") return <DepthView currentRate={currentRate} points={points} range={range} />;
+  if (mode === "technicals") return <TechnicalsView points={points} range={range} />;
+  if (mode === "risk") return <RiskView points={points} range={range} />;
+  if (mode === "projections") return <ProjectionView candles={candles} mlSettings={mlSettings} range={range} />;
+  return <BigChart points={points} range={range} />;
 }
 
-function BigChart({ points }: { points: RatePoint[] }) {
+function BigChart({ points, range: chartRange }: { points: RatePoint[]; range: ChartRangeKey }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<ChartTooltipPosition | null>(null);
 
@@ -68,14 +90,13 @@ function BigChart({ points }: { points: RatePoint[] }) {
   const width = 900;
   const height = 310;
   const pad = 22;
-  const visiblePoints = points.slice(-252);
-  const values = visiblePoints.map((point) => point.rate);
+  const values = points.map((point) => point.rate);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const range = max - min || 1;
-  const coordinates = visiblePoints.map((point, index) => {
-    const x = pad + (index / (visiblePoints.length - 1)) * (width - pad * 2);
-    const y = pad + (1 - (point.rate - min) / range) * (height - pad * 2);
+  const valueRange = max - min || 1;
+  const coordinates = points.map((point, index) => {
+    const x = pad + (index / (points.length - 1)) * (width - pad * 2);
+    const y = pad + (1 - (point.rate - min) / valueRange) * (height - pad * 2);
     return { ...point, x, y };
   });
   const line = coordinates.map((point) => `${point.x},${point.y}`).join(" ");
@@ -106,7 +127,13 @@ function BigChart({ points }: { points: RatePoint[] }) {
   }
 
   return (
-    <div className="interactive-chart">
+    <div className="line-view">
+      <GraphHeader
+        description="Closing price over the selected visible range, with exact date and close available on inspection."
+        legend={[{ label: "Close", tone: rising ? "green" : "red" }]}
+        title="Price path"
+      />
+      <div className="interactive-chart">
       <svg
         aria-label="Interactive stock chart"
         className={rising ? "big-chart up" : "big-chart down"}
@@ -130,6 +157,12 @@ function BigChart({ points }: { points: RatePoint[] }) {
         </defs>
         <path className="area" d={area} />
         <polyline points={line} />
+        <text className="axis-label" x={pad} y={16}>
+          Price
+        </text>
+        <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
+          {getRangeLabel(chartRange)}
+        </text>
         {activePoint ? (
           <>
             <line className="chart-focus-line" x1={activePoint.x} x2={activePoint.x} y1={pad} y2={height - pad} />
@@ -143,32 +176,32 @@ function BigChart({ points }: { points: RatePoint[] }) {
           <strong>{formatPrice(activePoint.rate)}</strong>
         </div>
       ) : null}
-      <ChartRange end={visiblePoints[visiblePoints.length - 1].date} max={max} min={min} start={visiblePoints[0].date} />
+      <ChartRange end={points[points.length - 1].date} start={points[0].date} summary={`${formatRate(min)} - ${formatRate(max)}`} />
+      </div>
     </div>
   );
 }
 
-function CandleChart({ candles }: { candles: StockCandle[] }) {
+function CandleChart({ candles, range: chartRange }: { candles: StockCandle[]; range: ChartRangeKey }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<ChartTooltipPosition | null>(null);
 
   if (candles.length < 2) return <ChartFallback label="No candle data yet" />;
 
-  const visibleCandles = candles.slice(-120);
   const width = 900;
   const height = 310;
   const pad = 24;
-  const lows = visibleCandles.map((point) => point.low);
-  const highs = visibleCandles.map((point) => point.high);
+  const lows = candles.map((point) => point.low);
+  const highs = candles.map((point) => point.high);
   const min = Math.min(...lows);
   const max = Math.max(...highs);
-  const range = max - min || 1;
+  const valueRange = max - min || 1;
   const innerWidth = width - pad * 2;
-  const candleGap = innerWidth / visibleCandles.length;
+  const candleGap = innerWidth / candles.length;
   const bodyWidth = Math.max(3, Math.min(8, candleGap * 0.54));
-  const coordinates = visibleCandles.map((point, index) => {
+  const coordinates = candles.map((point, index) => {
     const x = pad + candleGap * index + candleGap / 2;
-    const y = (value: number) => pad + (1 - (value - min) / range) * (height - pad * 2);
+    const y = (value: number) => pad + (1 - (value - min) / valueRange) * (height - pad * 2);
     return {
       ...point,
       bodyBottom: y(Math.min(point.open, point.close)),
@@ -200,7 +233,16 @@ function CandleChart({ candles }: { candles: StockCandle[] }) {
   }
 
   return (
-    <div className="interactive-chart candle-shell">
+    <div className="candle-view">
+      <GraphHeader
+        description="Daily open, high, low, and close candles. Green means close finished above open; red means it finished below open."
+        legend={[
+          { label: "Up candle", tone: "green" },
+          { label: "Down candle", tone: "red" },
+        ]}
+        title="Candles"
+      />
+      <div className="interactive-chart candle-shell">
       <svg
         aria-label="Candlestick chart"
         className="candle-chart"
@@ -219,6 +261,12 @@ function CandleChart({ candles }: { candles: StockCandle[] }) {
         <line className="chart-grid" x1={pad} x2={width - pad} y1={pad} y2={pad} />
         <line className="chart-grid" x1={pad} x2={width - pad} y1={height / 2} y2={height / 2} />
         <line className="chart-grid" x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} />
+        <text className="axis-label" x={pad} y={16}>
+          OHLC
+        </text>
+        <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
+          {getRangeLabel(chartRange)}
+        </text>
         {coordinates.map((point) => {
           const rising = point.close >= point.open;
           const bodyHeight = Math.max(2, point.bodyBottom - point.bodyTop);
@@ -245,13 +293,16 @@ function CandleChart({ candles }: { candles: StockCandle[] }) {
           <em>L {formatRate(activePoint.low)}</em>
         </div>
       ) : null}
-      <ChartRange end={visibleCandles[visibleCandles.length - 1].date} max={max} min={min} start={visibleCandles[0].date} />
+      <ChartRange end={candles[candles.length - 1].date} start={candles[0].date} summary={`${formatRate(min)} - ${formatRate(max)}`} />
+      </div>
     </div>
   );
 }
 
-function ReturnsView({ points }: { points: RatePoint[] }) {
-  const returns = getReturns(points).slice(-120);
+function ReturnsView({ points, range }: { points: RatePoint[]; range: ChartRangeKey }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [tooltip, setTooltip] = useState<ChartTooltipPosition | null>(null);
+  const returns = getReturns(points);
   if (!returns.length) return <ChartFallback label="No return data yet" />;
 
   const width = 900;
@@ -260,38 +311,101 @@ function ReturnsView({ points }: { points: RatePoint[] }) {
   const maxAbs = Math.max(...returns.map((point) => Math.abs(point.returnValue))) || 1;
   const barGap = (width - pad * 2) / returns.length;
   const zeroY = height / 2;
+  const bars = returns.map((point, index) => {
+    const x = pad + index * barGap;
+    const barHeight = Math.max(2, (Math.abs(point.returnValue) / maxAbs) * (height / 2 - pad));
+    const y = point.returnValue >= 0 ? zeroY - barHeight : zeroY;
+    return {
+      ...point,
+      barHeight,
+      x,
+      y,
+    };
+  });
+  const activePoint = hoveredIndex === null ? null : bars[hoveredIndex];
+
+  function selectPoint(clientX: number, clientY: number, bounds: DOMRect) {
+    const x = ((clientX - bounds.left) / bounds.width) * width;
+    const index = Math.round((x - pad) / barGap);
+    setHoveredIndex(Math.max(0, Math.min(bars.length - 1, index)));
+    setTooltip(getTooltipPosition(clientX, clientY));
+  }
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    selectPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
+  }
+
+  function handleTouch(event: TouchEvent<SVGSVGElement>) {
+    const touch = event.touches[0] ?? event.changedTouches[0];
+    if (!touch) return;
+    selectPoint(touch.clientX, touch.clientY, event.currentTarget.getBoundingClientRect());
+  }
 
   return (
     <div className="returns-view">
-      <svg aria-label="Daily return bars" className="returns-chart" preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`}>
-        <line className="chart-grid zero" x1={pad} x2={width - pad} y1={zeroY} y2={zeroY} />
-        {returns.map((point, index) => {
-          const x = pad + index * barGap;
-          const barHeight = Math.max(2, (Math.abs(point.returnValue) / maxAbs) * (height / 2 - pad));
-          const y = point.returnValue >= 0 ? zeroY - barHeight : zeroY;
-          return (
+      <GraphHeader
+        description="One bar per daily close-to-close return in the selected range."
+        legend={[
+          { label: "Gain", tone: "green" },
+          { label: "Loss", tone: "red" },
+        ]}
+        title="Daily returns"
+      />
+      <div className="interactive-chart">
+        <svg
+          aria-label="Daily return bars"
+          className="returns-chart"
+          onPointerDown={handlePointerMove}
+          onPointerLeave={() => {
+            setHoveredIndex(null);
+            setTooltip(null);
+          }}
+          onPointerMove={handlePointerMove}
+          onTouchMove={handleTouch}
+          onTouchStart={handleTouch}
+          preserveAspectRatio="none"
+          role="img"
+          viewBox={`0 0 ${width} ${height}`}
+        >
+          <line className="chart-grid zero" x1={pad} x2={width - pad} y1={zeroY} y2={zeroY} />
+          <text className="axis-label" x={pad} y={16}>
+            Daily %
+          </text>
+          <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
+            {getRangeLabel(range)}
+          </text>
+          {bars.map((point) => (
             <rect
               className={point.returnValue >= 0 ? "return-bar up" : "return-bar down"}
-              height={barHeight}
+              height={point.barHeight}
               key={point.date}
               rx="2"
               width={Math.max(2, barGap * 0.7)}
-              x={x}
-              y={y}
+              x={point.x}
+              y={point.y}
             />
-          );
-        })}
-      </svg>
+          ))}
+          {activePoint ? <line className="chart-focus-line" x1={activePoint.x} x2={activePoint.x} y1={pad} y2={height - pad} /> : null}
+        </svg>
+        {activePoint && tooltip ? (
+          <FloatingChartTooltip
+            lines={[{ value: activePoint.date }, { label: "Daily return", value: formatPercent(activePoint.returnValue, true) }]}
+            position={tooltip}
+            title={activePoint.returnValue >= 0 ? "Gain" : "Loss"}
+          />
+        ) : null}
+        <ChartRange end={returns[returns.length - 1].date} start={returns[0].date} summary={`Max move ${formatPercent(maxAbs, true)}`} />
+      </div>
       <div className="broker-panels">
-        <BrokerDatum label="Best day" value={formatPercent(Math.max(...returns.map((point) => point.returnValue)), true)} />
-        <BrokerDatum label="Worst day" value={formatPercent(Math.min(...returns.map((point) => point.returnValue)), true)} />
-        <BrokerDatum label="Mean day" value={formatPercent(mean(returns.map((point) => point.returnValue)), true)} />
+        <BrokerDatum detail="Largest positive daily close-to-close return in the selected range." label="Best day" value={formatPercent(Math.max(...returns.map((point) => point.returnValue)), true)} />
+        <BrokerDatum detail="Largest negative daily close-to-close return in the selected range." label="Worst day" value={formatPercent(Math.min(...returns.map((point) => point.returnValue)), true)} />
+        <BrokerDatum detail="Average daily close-to-close return in the selected range." label="Mean day" value={formatPercent(mean(returns.map((point) => point.returnValue)), true)} />
       </div>
     </div>
   );
 }
 
-function DepthView({ currentRate, points }: { currentRate: number; points: RatePoint[] }) {
+function DepthView({ currentRate, points, range }: { currentRate: number; points: RatePoint[]; range: ChartRangeKey }) {
   const returns = getReturns(points);
   const volatility = standardDeviation(returns.map((point) => point.returnValue));
   const step = Math.max(currentRate * 0.0008, currentRate * volatility * 0.22);
@@ -314,6 +428,14 @@ function DepthView({ currentRate, points }: { currentRate: number; points: RateP
 
   return (
     <div className="depth-view">
+      <GraphHeader
+        description="A simulated order-book view built from recent volatility and the current price. It is useful for shape and imbalance, not live liquidity."
+        legend={[
+          { label: "Bid model", tone: "green" },
+          { label: "Ask model", tone: "red" },
+        ]}
+        title={`Modeled depth from ${getRangeLabel(range)} history`}
+      />
       <div className="depth-book">
         <div className="depth-head">
           <span>Bid model</span>
@@ -321,7 +443,12 @@ function DepthView({ currentRate, points }: { currentRate: number; points: RateP
           <span>Ask model</span>
         </div>
         {levels.map((level) => (
-          <div className="depth-row" key={`${level.bid}-${level.ask}`}>
+          <div
+            aria-label={`Modeled bid ${formatRate(level.bid)} size ${formatCompact(level.bidSize, 0)}, modeled ask ${formatRate(level.ask)} size ${formatCompact(level.askSize, 0)}`}
+            className="depth-row hover-data-row"
+            key={`${level.bid}-${level.ask}`}
+            title="Modeled level from current price, selected-range volatility, and a smooth liquidity decay. This is not a live order book."
+          >
             <div>
               <span style={{ width: `${(level.bidSize / maxSize) * 100}%` }} />
               <strong>{formatRate(level.bid)}</strong>
@@ -336,15 +463,15 @@ function DepthView({ currentRate, points }: { currentRate: number; points: RateP
         ))}
       </div>
       <div className="broker-panels">
-        <BrokerDatum label="Model spread" value={formatRate(spread)} />
-        <BrokerDatum label="Book skew" tone={imbalance >= 0 ? "positive" : "negative"} value={formatPercent(imbalance, true)} />
-        <BrokerDatum label="Vol input" value={formatPercent(volatility)} />
+        <BrokerDatum detail="Distance between the nearest modeled bid and ask levels." label="Model spread" value={formatRate(spread)} />
+        <BrokerDatum detail="Bid minus ask modeled size divided by total modeled size. Positive means the model leans bid-heavy." label="Book skew" tone={imbalance >= 0 ? "positive" : "negative"} value={formatPercent(imbalance, true)} />
+        <BrokerDatum detail={`Daily return volatility calculated from the selected ${getRangeLabel(range)} range.`} label="Vol input" value={formatPercent(volatility)} />
       </div>
     </div>
   );
 }
 
-function TechnicalsView({ points }: { points: RatePoint[] }) {
+function TechnicalsView({ points, range }: { points: RatePoint[]; range: ChartRangeKey }) {
   if (points.length < 30) {
     return (
       <div className="chart-fallback">
@@ -365,53 +492,139 @@ function TechnicalsView({ points }: { points: RatePoint[] }) {
 
   return (
     <div className="technicals-view">
-      <TechnicalOverlay points={points} />
+      <GraphHeader
+        description="Closing price with 20-day and 50-day simple moving averages."
+        legend={[
+          { label: "Price", tone: "green" },
+          { label: "SMA 20", tone: "blue" },
+          { label: "SMA 50", tone: "yellow" },
+        ]}
+        title="Technical overlay"
+      />
+      <TechnicalOverlay points={points} range={range} />
       <div className="broker-panels technical-grid">
-        <BrokerDatum label="Trend" tone={trend === "Bullish" ? "positive" : trend === "Bearish" ? "negative" : ""} value={trend} />
-        <BrokerDatum label="SMA 20" value={formatPrice(sma20)} />
-        <BrokerDatum label="SMA 50" value={formatPrice(sma50)} />
-        <BrokerDatum label="RSI 14" tone={rsi14 >= 70 ? "negative" : rsi14 <= 30 ? "positive" : ""} value={formatCompact(rsi14, 1)} />
-        <BrokerDatum label="MACD" tone={macd.histogram >= 0 ? "positive" : "negative"} value={formatCompact(macd.histogram, 5)} />
-        <BrokerDatum label="20D mom" tone={momentum20 >= 0 ? "positive" : "negative"} value={formatPercent(momentum20, true)} />
+        <BrokerDatum detail="Bullish when price is above SMA 20 and SMA 20 is above SMA 50; bearish when the stack is inverted." label="Trend" tone={trend === "Bullish" ? "positive" : trend === "Bearish" ? "negative" : ""} value={trend} />
+        <BrokerDatum detail="Average close over the latest 20 trading sessions in the selected range." label="SMA 20" value={formatPrice(sma20)} />
+        <BrokerDatum detail="Average close over the latest 50 trading sessions in the selected range." label="SMA 50" value={formatPrice(sma50)} />
+        <BrokerDatum detail="Relative Strength Index over 14 sessions. Above 70 is commonly read as stretched; below 30 as washed out." label="RSI 14" tone={rsi14 >= 70 ? "negative" : rsi14 <= 30 ? "positive" : ""} value={formatCompact(rsi14, 1)} />
+        <BrokerDatum detail="MACD histogram: the gap between MACD and its signal line. Positive means momentum is above its signal." label="MACD" tone={macd.histogram >= 0 ? "positive" : "negative"} value={formatCompact(macd.histogram, 5)} />
+        <BrokerDatum detail="Latest close versus the 20-day moving average." label="20D mom" tone={momentum20 >= 0 ? "positive" : "negative"} value={formatPercent(momentum20, true)} />
       </div>
     </div>
   );
 }
 
-function TechnicalOverlay({ points }: { points: RatePoint[] }) {
-  const visible = points.slice(-120);
+function TechnicalOverlay({ points, range: chartRange }: { points: RatePoint[]; range: ChartRangeKey }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [tooltip, setTooltip] = useState<ChartTooltipPosition | null>(null);
+  const visible = points;
   const width = 900;
   const height = 270;
   const pad = 24;
   const values = visible.map((point) => point.rate);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const range = max - min || 1;
+  const valueRange = max - min || 1;
+  const sma20 = rollingAverage(values, 20);
+  const sma50 = rollingAverage(values, 50);
+  const coordinates = visible.map((point, index) => {
+    const x = pad + (index / (visible.length - 1)) * (width - pad * 2);
+    const y = pad + (1 - (point.rate - min) / valueRange) * (height - pad * 2);
+    const yFor = (value: number) => pad + (1 - (value - min) / valueRange) * (height - pad * 2);
+    return {
+      ...point,
+      sma20: sma20[index],
+      sma20Y: yFor(sma20[index]),
+      sma50: sma50[index],
+      sma50Y: yFor(sma50[index]),
+      x,
+      y,
+    };
+  });
+  const activePoint = hoveredIndex === null ? null : coordinates[hoveredIndex];
   const toPath = (series: number[]) =>
     series
       .map((value, index) => {
         const x = pad + (index / (series.length - 1)) * (width - pad * 2);
-        const y = pad + (1 - (value - min) / range) * (height - pad * 2);
+        const y = pad + (1 - (value - min) / valueRange) * (height - pad * 2);
         return `${index === 0 ? "M" : "L"} ${x} ${y}`;
       })
       .join(" ");
   const pricePath = toPath(values);
-  const sma20Path = toPath(rollingAverage(visible.map((point) => point.rate), 20));
-  const sma50Path = toPath(rollingAverage(visible.map((point) => point.rate), 50));
+  const sma20Path = toPath(sma20);
+  const sma50Path = toPath(sma50);
+
+  function selectPoint(clientX: number, clientY: number, bounds: DOMRect) {
+    const x = ((clientX - bounds.left) / bounds.width) * width;
+    const index = Math.round(((x - pad) / (width - pad * 2)) * (coordinates.length - 1));
+    setHoveredIndex(Math.max(0, Math.min(coordinates.length - 1, index)));
+    setTooltip(getTooltipPosition(clientX, clientY));
+  }
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    selectPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
+  }
+
+  function handleTouch(event: TouchEvent<SVGSVGElement>) {
+    const touch = event.touches[0] ?? event.changedTouches[0];
+    if (!touch) return;
+    selectPoint(touch.clientX, touch.clientY, event.currentTarget.getBoundingClientRect());
+  }
 
   return (
-    <svg aria-label="Technical overlay chart" className="technical-chart" preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`}>
-      <line className="chart-grid" x1={pad} x2={width - pad} y1={pad} y2={pad} />
-      <line className="chart-grid" x1={pad} x2={width - pad} y1={height / 2} y2={height / 2} />
-      <line className="chart-grid" x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} />
-      <path className="technical-line price" d={pricePath} />
-      <path className="technical-line sma20" d={sma20Path} />
-      <path className="technical-line sma50" d={sma50Path} />
-    </svg>
+    <div className="interactive-chart">
+      <svg
+        aria-label="Technical overlay chart"
+        className="technical-chart"
+        onPointerDown={handlePointerMove}
+        onPointerLeave={() => {
+          setHoveredIndex(null);
+          setTooltip(null);
+        }}
+        onPointerMove={handlePointerMove}
+        onTouchMove={handleTouch}
+        onTouchStart={handleTouch}
+        preserveAspectRatio="none"
+        role="img"
+        viewBox={`0 0 ${width} ${height}`}
+      >
+        <line className="chart-grid" x1={pad} x2={width - pad} y1={pad} y2={pad} />
+        <line className="chart-grid" x1={pad} x2={width - pad} y1={height / 2} y2={height / 2} />
+        <line className="chart-grid" x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} />
+        <text className="axis-label" x={pad} y={16}>
+          Price + averages
+        </text>
+        <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
+          {getRangeLabel(chartRange)}
+        </text>
+        <path className="technical-line price" d={pricePath} />
+        <path className="technical-line sma20" d={sma20Path} />
+        <path className="technical-line sma50" d={sma50Path} />
+        {activePoint ? (
+          <>
+            <line className="chart-focus-line" x1={activePoint.x} x2={activePoint.x} y1={pad} y2={height - pad} />
+            <circle className="chart-marker tech-price" cx={activePoint.x} cy={activePoint.y} r="6" />
+          </>
+        ) : null}
+      </svg>
+      {activePoint && tooltip ? (
+        <FloatingChartTooltip
+          lines={[
+            { value: activePoint.date },
+            { label: "Close", value: formatPrice(activePoint.rate) },
+            { label: "SMA 20", value: formatPrice(activePoint.sma20) },
+            { label: "SMA 50", value: formatPrice(activePoint.sma50) },
+          ]}
+          position={tooltip}
+          title="Technical read"
+        />
+      ) : null}
+      <ChartRange end={visible[visible.length - 1].date} start={visible[0].date} summary={`${formatRate(min)} - ${formatRate(max)}`} />
+    </div>
   );
 }
 
-function RiskView({ points }: { points: RatePoint[] }) {
+function RiskView({ points, range }: { points: RatePoint[]; range: ChartRangeKey }) {
   const returns = getReturns(points);
   const values = points.map((point) => point.rate);
 
@@ -424,7 +637,7 @@ function RiskView({ points }: { points: RatePoint[] }) {
     );
   }
 
-  const drawdowns = getDrawdownSeries(values).slice(-160);
+  const drawdowns = getDrawdownSeries(values).map((value, index) => ({ date: points[index].date, value }));
   const rollingVol = standardDeviation(returns.slice(-20).map((point) => point.returnValue)) * Math.sqrt(252);
   const dailyMean = mean(returns.map((point) => point.returnValue));
   const dailyVol = standardDeviation(returns.map((point) => point.returnValue));
@@ -434,28 +647,36 @@ function RiskView({ points }: { points: RatePoint[] }) {
 
   return (
     <div className="risk-view">
-      <DrawdownChart points={drawdowns} />
+      <GraphHeader
+        description="Drawdown shows how far price has fallen from the previous high inside the selected range."
+        legend={[{ label: "Drawdown", tone: "red" }]}
+        title="Risk and drawdown"
+      />
+      <DrawdownChart points={drawdowns} range={range} />
       <div className="broker-panels technical-grid">
-        <BrokerDatum label="20D vol" value={formatPercent(rollingVol)} />
-        <BrokerDatum label="Daily VaR 95" tone="negative" value={formatPercent(var95, true)} />
-        <BrokerDatum label="Upside days" value={formatPercent(upsideDays)} />
-        <BrokerDatum label="Reward/risk" tone={rewardRisk >= 0 ? "positive" : "negative"} value={formatCompact(rewardRisk, 2)} />
-        <BrokerDatum label="Worst close" value={formatPrice(Math.min(...values))} />
-        <BrokerDatum label="Best close" value={formatPrice(Math.max(...values))} />
+        <BrokerDatum detail="Annualized volatility from the latest 20 daily returns in the selected range." label="20D vol" value={formatPercent(rollingVol)} />
+        <BrokerDatum detail="Simple 95% one-day value-at-risk estimate: mean daily return minus 1.65 standard deviations." label="Daily VaR 95" tone="negative" value={formatPercent(var95, true)} />
+        <BrokerDatum detail="Share of daily returns in the selected range that closed flat or positive." label="Upside days" value={formatPercent(upsideDays)} />
+        <BrokerDatum detail="Annualized mean daily return divided by daily volatility. Positive values imply more reward per unit of volatility." label="Reward/risk" tone={rewardRisk >= 0 ? "positive" : "negative"} value={formatCompact(rewardRisk, 2)} />
+        <BrokerDatum detail="Lowest close in the selected range." label="Worst close" value={formatPrice(Math.min(...values))} />
+        <BrokerDatum detail="Highest close in the selected range." label="Best close" value={formatPrice(Math.max(...values))} />
       </div>
     </div>
   );
 }
 
-function MlView({ candles, mlSettings }: { candles: StockCandle[]; mlSettings: MlSettings }) {
+function ProjectionView({ candles, mlSettings, range }: { candles: StockCandle[]; mlSettings: MlSettings; range: ChartRangeKey }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [tooltip, setTooltip] = useState<ChartTooltipPosition | null>(null);
   const ml = getMlSignals(candles, mlSettings);
   const history = ml.probabilityHistory;
+  const visibleHistory = filterByRange(history, range);
 
-  if (ml.status === "limited" || history.length < 2) {
+  if (ml.status === "limited" || visibleHistory.length < 2) {
     return (
       <div className="chart-fallback">
         <Gauge size={28} />
-        <span>More candles are needed for ML signals</span>
+        <span>More candles are needed for projections</span>
       </div>
     );
   }
@@ -463,31 +684,109 @@ function MlView({ candles, mlSettings }: { candles: StockCandle[]; mlSettings: M
   const width = 900;
   const height = 260;
   const pad = 24;
-  const line = history
+  const coordinates = visibleHistory.map((point, index) => {
+    const x = pad + (index / (visibleHistory.length - 1)) * (width - pad * 2);
+    const y = pad + (1 - point.probabilityUp) * (height - pad * 2);
+    return {
+      ...point,
+      x,
+      y,
+    };
+  });
+  const activePoint = hoveredIndex === null ? null : coordinates[hoveredIndex];
+  const line = coordinates
     .map((point, index) => {
-      const x = pad + (index / (history.length - 1)) * (width - pad * 2);
-      const y = pad + (1 - point.probabilityUp) * (height - pad * 2);
+      const { x, y } = point;
       return `${index === 0 ? "M" : "L"} ${x} ${y}`;
     })
     .join(" ");
   const area = `${line} L ${width - pad} ${height - pad} L ${pad} ${height - pad} Z`;
   const maxContribution = Math.max(...ml.features.map((feature) => Math.abs(feature.contribution)), 0.001);
 
+  function selectPoint(clientX: number, clientY: number, bounds: DOMRect) {
+    const x = ((clientX - bounds.left) / bounds.width) * width;
+    const index = Math.round(((x - pad) / (width - pad * 2)) * (coordinates.length - 1));
+    setHoveredIndex(Math.max(0, Math.min(coordinates.length - 1, index)));
+    setTooltip(getTooltipPosition(clientX, clientY));
+  }
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    selectPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
+  }
+
+  function handleTouch(event: TouchEvent<SVGSVGElement>) {
+    const touch = event.touches[0] ?? event.changedTouches[0];
+    if (!touch) return;
+    selectPoint(touch.clientX, touch.clientY, event.currentTarget.getBoundingClientRect());
+  }
+
   return (
-    <div className="ml-view">
-      <svg aria-label="ML probability chart" className="ml-chart" preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`}>
-        <defs>
-          <linearGradient id="mlFill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#64d2ff" stopOpacity="0.24" />
-            <stop offset="100%" stopColor="#64d2ff" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <line className="chart-grid" x1={pad} x2={width - pad} y1={pad} y2={pad} />
-        <line className="chart-grid zero" x1={pad} x2={width - pad} y1={height / 2} y2={height / 2} />
-        <line className="chart-grid" x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} />
-        <path className="ml-area" d={area} />
-        <path className="ml-line" d={line} />
-      </svg>
+    <div className="projection-view">
+      <GraphHeader
+        description={`Probability history for the selected ${getHorizonLabel(ml.horizon)} horizon. The chart is filtered by visible range; the model still trains from the selected training window.`}
+        legend={[
+          { label: "Up probability", tone: "blue" },
+          { label: "50% neutral line", tone: "yellow" },
+        ]}
+        title="Projection probability"
+      />
+      <div className="interactive-chart">
+        <svg
+          aria-label="Projection probability chart"
+          className="projection-chart"
+          onPointerDown={handlePointerMove}
+          onPointerLeave={() => {
+            setHoveredIndex(null);
+            setTooltip(null);
+          }}
+          onPointerMove={handlePointerMove}
+          onTouchMove={handleTouch}
+          onTouchStart={handleTouch}
+          preserveAspectRatio="none"
+          role="img"
+          viewBox={`0 0 ${width} ${height}`}
+        >
+          <defs>
+            <linearGradient id="projectionFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#64d2ff" stopOpacity="0.24" />
+              <stop offset="100%" stopColor="#64d2ff" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <line className="chart-grid" x1={pad} x2={width - pad} y1={pad} y2={pad} />
+          <line className="chart-grid zero" x1={pad} x2={width - pad} y1={height / 2} y2={height / 2} />
+          <line className="chart-grid" x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} />
+          <text className="axis-label" x={pad} y={16}>
+            Up probability
+          </text>
+          <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
+            {getRangeLabel(range)}
+          </text>
+          <path className="projection-area" d={area} />
+          <path className="projection-line" d={line} />
+          {activePoint ? (
+            <>
+              <line className="chart-focus-line" x1={activePoint.x} x2={activePoint.x} y1={pad} y2={height - pad} />
+              <circle className="chart-marker projection-marker" cx={activePoint.x} cy={activePoint.y} r="7" />
+            </>
+          ) : null}
+        </svg>
+        {activePoint && tooltip ? (
+          <FloatingChartTooltip
+            lines={[
+              { value: activePoint.date },
+              { label: "Up probability", value: formatPercent(activePoint.probabilityUp) },
+              { label: "Realized forward move", value: formatPercent(activePoint.nextReturn, true) },
+            ]}
+            position={tooltip}
+            title={`${getHorizonLabel(ml.horizon)} projection`}
+          />
+        ) : null}
+        <ChartRange
+          end={visibleHistory[visibleHistory.length - 1].date}
+          start={visibleHistory[0].date}
+          summary={`${formatPercent(Math.min(...visibleHistory.map((point) => point.probabilityUp)))} - ${formatPercent(Math.max(...visibleHistory.map((point) => point.probabilityUp)))}`}
+        />
+      </div>
       <div className="broker-panels technical-grid">
         <BrokerDatum
           detail="Probability that the selected horizon closes above the latest close, from the local logistic classifier."
@@ -506,19 +805,25 @@ function MlView({ candles, mlSettings }: { candles: StockCandle[]; mlSettings: M
         <BrokerDatum detail="Label from trend stack, momentum, RSI, and drawdown." label="Trend" value={ml.trend.label} />
         <BrokerDatum detail="Volatility and probability regime for the selected horizon." label="Regime" value={ml.regime} />
       </div>
-      <div className="forecast-strip" aria-label="ML forward horizons">
+      <div className="forecast-strip" aria-label="Projection forward horizons">
         {ml.forecasts.map((forecast) => (
           <div className={forecast.expectedMove >= 0 ? "forecast-card positive" : "forecast-card negative"} key={forecast.horizon}>
-            <span>{getHorizonLabel(forecast.horizon)}</span>
+            <span>
+              {getHorizonLabel(forecast.horizon)}
+              <InfoTip text={`Retrains this symbol's local projection model for ${getHorizonLabel(forecast.horizon)} and averages nearby historical setups. Sample size: ${forecast.sampleSize}.`} />
+            </span>
             <strong>{formatPercent(forecast.expectedMove, true)}</strong>
             <em>{formatPercent(forecast.probabilityUp)} up</em>
           </div>
         ))}
       </div>
-      <div className="feature-stack" aria-label="ML feature contributions">
+      <div className="feature-stack" aria-label="Projection feature contributions">
         {ml.features.slice(0, 6).map((feature) => (
           <div className={feature.direction === "bullish" ? "feature-row positive" : "feature-row negative"} key={feature.label}>
-            <span>{feature.label}</span>
+            <span>
+              {feature.label}
+              <InfoTip text={`${feature.detail} Contribution shows this feature's current push after model weighting and scaling.`} />
+            </span>
             <div>
               <em style={{ width: `${(Math.abs(feature.contribution) / maxContribution) * 100}%` }} />
             </div>
@@ -529,9 +834,25 @@ function MlView({ candles, mlSettings }: { candles: StockCandle[]; mlSettings: M
       <div className="trend-stack" aria-label="Trend components">
         {ml.trend.components.map((component) => (
           <div className={component.score >= 0 ? "trend-row positive" : "trend-row negative"} key={component.label}>
-            <span>{component.label}</span>
+            <span>
+              {component.label}
+              <InfoTip text={getTrendComponentDetail(component.label)} />
+            </span>
             <strong>{component.value}</strong>
             <em>{formatCompact(component.score, 2)}</em>
+          </div>
+        ))}
+      </div>
+      <div className="setup-stack" aria-label="Closest historical setups">
+        <div className="setup-head">
+          <strong>Closest historical setups</strong>
+          <InfoTip text="These are the historical feature snapshots nearest to today's setup. Their forward returns are averaged into the expected-move estimate." />
+        </div>
+        {ml.similarSetups.slice(0, 5).map((setup) => (
+          <div className="setup-row hover-data-row" key={setup.date}>
+            <span>{setup.date}</span>
+            <strong className={setup.nextReturn >= 0 ? "positive-text" : "negative-text"}>{formatPercent(setup.nextReturn, true)}</strong>
+            <em>distance {formatCompact(setup.distance, 2)}</em>
           </div>
         ))}
       </div>
@@ -539,37 +860,156 @@ function MlView({ candles, mlSettings }: { candles: StockCandle[]; mlSettings: M
   );
 }
 
-function DrawdownChart({ points }: { points: number[] }) {
+function DrawdownChart({ points, range: chartRange }: { points: Array<{ date: string; value: number }>; range: ChartRangeKey }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [tooltip, setTooltip] = useState<ChartTooltipPosition | null>(null);
   const width = 900;
   const height = 250;
   const pad = 22;
-  const min = Math.min(...points, 0);
-  const range = Math.abs(min) || 1;
-  const path = points
-    .map((value, index) => {
-      const x = pad + (index / (points.length - 1)) * (width - pad * 2);
-      const y = pad + (Math.abs(value) / range) * (height - pad * 2);
+  const values = points.map((point) => point.value);
+  const min = Math.min(...values, 0);
+  const valueRange = Math.abs(min) || 1;
+  const coordinates = points.map((point, index) => {
+    const x = pad + (index / (points.length - 1)) * (width - pad * 2);
+    const y = pad + (Math.abs(point.value) / valueRange) * (height - pad * 2);
+    return {
+      ...point,
+      x,
+      y,
+    };
+  });
+  const activePoint = hoveredIndex === null ? null : coordinates[hoveredIndex];
+  const path = coordinates
+    .map((point, index) => {
+      const { x, y } = point;
       return `${index === 0 ? "M" : "L"} ${x} ${y}`;
     })
     .join(" ");
   const area = `${path} L ${width - pad} ${pad} L ${pad} ${pad} Z`;
 
+  function selectPoint(clientX: number, clientY: number, bounds: DOMRect) {
+    const x = ((clientX - bounds.left) / bounds.width) * width;
+    const index = Math.round(((x - pad) / (width - pad * 2)) * (coordinates.length - 1));
+    setHoveredIndex(Math.max(0, Math.min(coordinates.length - 1, index)));
+    setTooltip(getTooltipPosition(clientX, clientY));
+  }
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    selectPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
+  }
+
+  function handleTouch(event: TouchEvent<SVGSVGElement>) {
+    const touch = event.touches[0] ?? event.changedTouches[0];
+    if (!touch) return;
+    selectPoint(touch.clientX, touch.clientY, event.currentTarget.getBoundingClientRect());
+  }
+
   return (
-    <svg aria-label="Drawdown chart" className="drawdown-chart" preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`}>
-      <line className="chart-grid zero" x1={pad} x2={width - pad} y1={pad} y2={pad} />
-      <path className="drawdown-area" d={area} />
-      <path className="drawdown-line" d={path} />
-    </svg>
+    <div className="interactive-chart">
+      <svg
+        aria-label="Drawdown chart"
+        className="drawdown-chart"
+        onPointerDown={handlePointerMove}
+        onPointerLeave={() => {
+          setHoveredIndex(null);
+          setTooltip(null);
+        }}
+        onPointerMove={handlePointerMove}
+        onTouchMove={handleTouch}
+        onTouchStart={handleTouch}
+        preserveAspectRatio="none"
+        role="img"
+        viewBox={`0 0 ${width} ${height}`}
+      >
+        <line className="chart-grid zero" x1={pad} x2={width - pad} y1={pad} y2={pad} />
+        <text className="axis-label" x={pad} y={16}>
+          Drawdown
+        </text>
+        <text className="axis-label" textAnchor="end" x={width - pad} y={height - 8}>
+          {getRangeLabel(chartRange)}
+        </text>
+        <path className="drawdown-area" d={area} />
+        <path className="drawdown-line" d={path} />
+        {activePoint ? (
+          <>
+            <line className="chart-focus-line" x1={activePoint.x} x2={activePoint.x} y1={pad} y2={height - pad} />
+            <circle className="chart-marker risk-marker" cx={activePoint.x} cy={activePoint.y} r="7" />
+          </>
+        ) : null}
+      </svg>
+      {activePoint && tooltip ? (
+        <FloatingChartTooltip
+          lines={[{ value: activePoint.date }, { label: "From prior high", value: formatPercent(activePoint.value, true) }]}
+          position={tooltip}
+          title="Drawdown"
+        />
+      ) : null}
+      <ChartRange end={points[points.length - 1].date} start={points[0].date} summary={`Worst ${formatPercent(min, true)}`} />
+    </div>
   );
 }
 
-function ChartRange({ end, max, min, start }: { end: string; max: number; min: number; start: string }) {
+function filterByRange<T>(items: T[], range: ChartRangeKey) {
+  return items.slice(-RANGE_LENGTHS[range]);
+}
+
+function getRangeLabel(range: ChartRangeKey) {
+  if (range === "1m") return "1M";
+  if (range === "3m") return "3M";
+  if (range === "6m") return "6M";
+  if (range === "1y") return "1Y";
+  return "5Y";
+}
+
+function GraphHeader({ description, legend = [], title }: { description: string; legend?: LegendItem[]; title: string }) {
+  return (
+    <div className="graph-header">
+      <div className="graph-title">
+        <strong>{title}</strong>
+        <span>{description}</span>
+      </div>
+      <InfoTip text={description} />
+      {legend.length ? (
+        <div className="graph-legend" aria-label={`${title} legend`}>
+          {legend.map((item) => (
+            <span className={item.tone ? `legend-item ${item.tone}` : "legend-item"} key={item.label}>
+              {item.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function FloatingChartTooltip({ lines, position, title }: { lines: TooltipLine[]; position: ChartTooltipPosition; title: string }) {
+  return (
+    <div className={getTooltipClassName(position)} style={{ left: position.left, top: position.top }}>
+      <span>{title}</span>
+      {lines.map((line) => (
+        <span className={line.label ? "tooltip-line" : ""} key={`${line.label ?? "line"}-${line.value}`}>
+          {line.label ? <em>{line.label}</em> : null}
+          <strong>{line.value}</strong>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function getTrendComponentDetail(label: string) {
+  if (label === "Stack") return "Checks whether the latest close, SMA 20, SMA 50, and SMA 200 are aligned upward, downward, or mixed.";
+  if (label === "20D trend") return "Latest close compared with the 20-day moving average, scaled into a -1 to +1 trend score.";
+  if (label === "50D trend") return "Latest close compared with the 50-day moving average, scaled into a -1 to +1 trend score.";
+  if (label === "RSI") return "Fourteen-session Relative Strength Index converted into a centered score. Higher means stronger recent buying pressure.";
+  if (label === "Drawdown") return "Current price versus the trailing one-year high. Smaller drawdowns score better.";
+  return "One piece of the trend score used to label the projection as bullish, mixed, or bearish.";
+}
+
+function ChartRange({ end, start, summary }: { end: string; start: string; summary: string }) {
   return (
     <div className="chart-range">
       <span>{start}</span>
-      <strong>
-        {formatRate(min)} - {formatRate(max)}
-      </strong>
+      <strong>{summary}</strong>
       <span>{end}</span>
     </div>
   );
@@ -599,11 +1039,7 @@ function BrokerDatum({
     <div className={tone ? `broker-datum ${tone}` : "broker-datum"}>
       <span>
         {label}
-        {detail ? (
-          <span className="mini-info" title={detail}>
-            i
-          </span>
-        ) : null}
+        {detail ? <InfoTip text={detail} /> : null}
       </span>
       <strong>{value}</strong>
     </div>

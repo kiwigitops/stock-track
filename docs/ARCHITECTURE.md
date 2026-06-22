@@ -9,13 +9,13 @@
 
 ## Modal And Charts
 
-- `src/components/QuoteModal.tsx` presents stock details, one-year quant metrics, configurable ML settings, forward forecasts, dataset explanations, and the broker chart workspace.
-- `src/components/charts/BrokerWorkspace.tsx` switches between chart modes and keeps chart rendering isolated from modal layout.
+- `src/components/QuoteModal.tsx` presents stock details, one-year quant metrics, configurable projection settings, forward forecasts, dataset explanations, chart range controls, and the broker chart workspace.
+- `src/components/charts/BrokerWorkspace.tsx` switches between chart modes and keeps chart rendering, legends, range-filtered views, hover inspection, and graph explanations isolated from modal layout.
 - `src/lib/analytics.ts` contains shared deterministic quant calculations: returns, RSI, MACD, moving averages, drawdowns, statistics, and volatility.
 
-## ML Module
+## Projection Module
 
-- `src/lib/ml.ts` is the ML seam.
+- `src/lib/ml.ts` is the internal machine-learning seam behind the Projections UI.
 - Its main interface is `getMlSignals(candles, settings)`.
 - Callers pass candles and user settings; the module hides feature extraction, horizon labelling, logistic training, validation, similar-setup lookup, trend scoring, and forecast generation.
 - `MlSettings` lives in `src/types.ts` and is persisted by `QuoteModal` through `usePersistentState`.
@@ -36,7 +36,7 @@
 
 ## Persistence
 
-- Local storage is used for preferences, watchlist additions, favorites, cash amount, quote cache, and ML settings.
+- Local storage is used for preferences, watchlist additions, favorites, cash amount, quote cache, and projection settings.
 - IndexedDB is used for paper-trade ledger events.
 - No backend server is required.
 
@@ -47,6 +47,8 @@
   - Market cards load.
   - Modal opens.
   - All chart tabs render.
-  - ML settings update the ML panel/tab.
+  - Range filters update every chart/data view.
+  - Projection settings update the projection panel/tab.
+  - Hover tooltips work on line, candles, returns, technicals, risk, and projection charts.
   - Paper trade ticket records a local trade.
   - No horizontal overflow on desktop or mobile.

@@ -12,7 +12,7 @@
 
 - Price, previous close, day high/low, volume, and 52-week range.
 - One-year quant metrics: return, annualized volatility, max drawdown, percentile, z-score, and sample count.
-- Dataset cards explain quote source, CORS proxy, local calculations, candle source, modelled depth, and local ML.
+- Dataset cards explain quote source, CORS proxy, local calculations, candle source, modelled depth, and local projections.
 - Broker chart tabs:
   - Candles
   - Line
@@ -20,9 +20,11 @@
   - Technicals
   - Risk
   - Depth
-  - ML
+  - Projections
+- All broker chart/data views share visible-range filters: 1M, 3M, 6M, 1Y, and 5Y.
+- Expanded graphs have labels, legends, calculation descriptions, and hover/touch inspection.
 
-## ML Signals
+## Projection Signals
 
 - Configurable horizon: 1D, 1W, 1M, 3M, 6M, or 1Y.
 - Configurable training window: 1Y, 2Y, 3Y, or 5Y.
@@ -30,8 +32,8 @@
 - Optional volume feature toggle.
 - Outputs up probability, expected move, confidence, holdout hit rate, regime, and trend.
 - Forward forecast cards show expected move and up probability from 1D through 1Y.
-- ML tab shows probability history, feature contribution bars, forecast strip, and trend components.
-- Hover/focus info markers explain model options and calculations.
+- Projections tab shows probability history, feature contribution bars, forecast strip, trend components, and closest historical setups.
+- Hover/focus info markers explain model options, chart calculations, and projection drivers.
 
 ## Paper Trading
 
@@ -45,6 +47,6 @@
 ## Data Notes
 
 - Quotes and OHLC history come from Yahoo Finance's public chart endpoint through `corsproxy.io`.
-- The app fetches five years of daily candles so longer ML horizons have enough history.
+- The app fetches five years of daily candles so longer projection horizons have enough history.
 - Visible quant stats remain focused on the latest one-year window.
-- The ML panel is exploratory and local. It is not financial advice or a real prediction engine.
+- The projection panel is exploratory and local. It is not financial advice or a real prediction engine.
