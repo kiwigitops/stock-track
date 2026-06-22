@@ -226,9 +226,9 @@ em {
 
 .focus-stage {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  grid-template-columns: minmax(0, 1.18fr) minmax(340px, 0.82fr);
   gap: var(--space-3);
-  margin-top: var(--space-7);
+  margin-top: var(--space-6);
 }
 
 .focus-panel,
@@ -251,9 +251,9 @@ em {
 
 .focus-panel {
   position: relative;
-  min-height: 330px;
+  min-height: 288px;
   overflow: hidden;
-  padding: var(--space-6);
+  padding: var(--space-5);
   color: inherit;
   text-align: left;
 }
@@ -307,28 +307,28 @@ em {
 
 .focus-symbol {
   display: block;
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
   color: #ffffff;
-  font-size: clamp(4.4rem, 12vw, 11rem);
-  line-height: 0.82;
+  font-size: clamp(3.7rem, 8vw, 8.4rem);
+  line-height: 0.86;
 }
 
 .focus-name {
   display: block;
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
   color: rgba(245, 247, 251, 0.58);
   font-size: 1rem;
   font-weight: 850;
 }
 
 .focus-panel .spark-shell {
-  margin: 20px 0 12px;
+  margin: 14px 0 10px;
 }
 
 .focus-bottom {
   position: relative;
   z-index: 1;
-  padding-top: var(--space-4);
+  padding-top: var(--space-3);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -336,7 +336,7 @@ em {
   display: block;
   margin-top: 4px;
   color: #ffffff;
-  font-size: clamp(1.5rem, 4vw, 3rem);
+  font-size: clamp(1.35rem, 3vw, 2.3rem);
   line-height: 1;
 }
 
@@ -345,7 +345,7 @@ em {
 }
 
 .focus-rail {
-  min-height: 330px;
+  min-height: 288px;
   padding: var(--space-4);
 }
 
@@ -620,7 +620,7 @@ select option {
 
 .quote-open {
   width: 100%;
-  min-height: 235px;
+  min-height: 208px;
   padding: var(--space-4);
   border: 0;
   color: inherit;
@@ -657,9 +657,9 @@ select option {
 
 .spark-shell {
   display: grid;
-  gap: var(--space-2);
+  gap: 6px;
   width: 100%;
-  margin: 18px 0;
+  margin: 14px 0;
   color: #31d158;
 }
 
@@ -709,22 +709,22 @@ select option {
 
 .spark-chart {
   position: relative;
-  min-height: 68px;
+  min-height: 54px;
 }
 
 .spark-shell.focus .spark-chart {
-  min-height: 88px;
+  min-height: 64px;
 }
 
 .spark {
   display: block;
   width: 100%;
-  height: 68px;
+  height: 54px;
   cursor: crosshair;
 }
 
 .spark-shell.focus .spark {
-  height: 88px;
+  height: 64px;
 }
 
 .spark-line,
@@ -740,10 +740,15 @@ select option {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 3.2;
+  stroke-width: 2.2;
   stroke-dasharray: 1;
   stroke-dashoffset: 0;
+  vector-effect: non-scaling-stroke;
   animation: draw-line 720ms var(--ease-out);
+}
+
+.spark-shell.focus .spark-line {
+  stroke-width: 2.6;
 }
 
 .spark-area {
@@ -754,6 +759,7 @@ select option {
 .spark-grid {
   stroke: rgba(245, 247, 251, 0.1);
   stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
 }
 
 .spark-axis {
@@ -767,12 +773,14 @@ select option {
   stroke: rgba(245, 247, 251, 0.38);
   stroke-dasharray: 2 2;
   stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .spark-marker {
   fill: #ffffff;
   stroke: currentColor;
   stroke-width: 2;
+  vector-effect: non-scaling-stroke;
 }
 
 .spark-tooltip {
@@ -2674,12 +2682,12 @@ select option {
   }
 
   .focus-panel {
-    min-height: 300px;
+    min-height: 260px;
     padding: 18px;
   }
 
   .focus-symbol {
-    font-size: clamp(3.6rem, 21vw, 6.2rem);
+    font-size: clamp(3.1rem, 17vw, 5.2rem);
   }
 
   .focus-bottom {
