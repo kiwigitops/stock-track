@@ -28,7 +28,8 @@
 
 ## Paper Trading
 
-- `src/components/PaperTradeDesk.tsx` is the UI for the Paper workspace.
+- `src/components/PaperTradeDesk.tsx` is the broker-style UI for the Paper workspace.
+- `App` passes `onOpenQuote` into `PaperTradeDesk` so the paper order console, positions, and ledger can reuse the existing expanded stock modal instead of owning a separate detail window.
 - `src/hooks/usePaperTrades.ts` loads, appends, and clears saved trades.
 - `src/lib/paperTrading.ts` is the local paper-trading module:
   - Creates normalized trade events.
@@ -58,4 +59,5 @@
   - Projection settings update the projection panel/tab.
   - Hover tooltips work on line, candles, returns, technicals, risk, and projection charts.
   - Paper trade ticket records a local trade.
+  - Paper workspace stock actions open the expanded stock modal.
   - No horizontal overflow on desktop or mobile.

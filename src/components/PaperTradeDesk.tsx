@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowUpRight, Briefcase, ChartLine, Plus, ReceiptText, RotateCcw, Trash2, Wallet } from "lucide-react";
 import { formatCompact, formatDateTime, formatMoney, formatPercent, formatPrice, normalizeSymbol } from "../lib/format";
-import { createPaperTrade, getPaperPortfolio, type PaperTradeSide } from "../lib/paperTrading";
+import { createPaperTrade, getPaperPortfolio, type PaperPosition, type PaperTradeSide } from "../lib/paperTrading";
 import { usePaperTrades } from "../hooks/usePaperTrades";
 import type { StockQuote } from "../types";
 import { InfoTip } from "./InfoTip";
@@ -9,10 +9,11 @@ import { InfoTip } from "./InfoTip";
 type PaperTradeDeskProps = {
   cash: number;
   onCashChange: (cash: number) => void;
+  onOpenQuote: (quote: StockQuote) => void;
   quotes: StockQuote[];
 };
 
-export function PaperTradeDesk({ cash, onCashChange, quotes }: PaperTradeDeskProps) {
+export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: PaperTradeDeskProps) {
   const { addTrade, loading, resetTrades, trades } = usePaperTrades();
   const [symbol, setSymbol] = useState(() => quotes[0]?.symbol ?? "AAPL");
   const [side, setSide] = useState<PaperTradeSide>("buy");
@@ -24,6 +25,14 @@ export function PaperTradeDesk({ cash, onCashChange, quotes }: PaperTradeDeskPro
   const quote = quoteMap.get(symbol);
   const portfolio = useMemo(() => getPaperPortfolio(trades, quotes, cash), [cash, quotes, trades]);
   const currentPosition = portfolio.positions.find((position) => position.symbol === symbol);
+  const selectedQuote = quote ?? quotes[0];
+  const selectedSymbol = selectedQuote?.symbol ?? normalizeSymbol(symbol);
+  const selectedName = selectedQuote?.name ?? "Saved symbol";
+  const selectedPrice = selectedQuote?.price ?? price;
+  const selectedMove = selectedQuote?.changePercent ?? 0;
+  const orderNotional = quantity * price;
+  const orderImpact = side === "buy" ? -orderNotional : orderNotional;
+  const currentReturn = getPositionReturn(currentPosition);
 
   useEffect(() => {
     if (quote) setPrice(roundMoney(quote.price));
@@ -62,8 +71,34 @@ export function PaperTradeDesk({ cash, onCashChange, quotes }: PaperTradeDeskPro
     setNote("");
   }
 
+  function openQuoteForSymbol(targetSymbol = selectedSymbol) {
+    const targetQuote = quoteMap.get(normalizeSymbol(targetSymbol));
+    if (targetQuote) onOpenQuote(targetQuote);
+  }
+
   return (
     <section className="paper-desk" aria-label="Paper trading simulation">
+      <section className="paper-command" aria-label="Paper account command center">
+        <div>
+          <span className="tiny-label">Paper Simulator</span>
+          <h2>Broker Ledger</h2>
+        </div>
+        <div className="paper-command-stats">
+          <span className="paper-chip">
+            <Wallet size={15} />
+            {formatMoney(portfolio.cash)}
+          </span>
+          <span className="paper-chip">
+            <Briefcase size={15} />
+            {portfolio.positions.length} holdings
+          </span>
+          <span className="paper-chip">
+            <ReceiptText size={15} />
+            {trades.length} fills
+          </span>
+        </div>
+      </section>
+
       <div className="paper-summary">
         <PaperMetric
           detail="Starting paper capital. It shares the app's cash amount so the watch cards and simulator use the same baseline."
@@ -78,13 +113,19 @@ export function PaperTradeDesk({ cash, onCashChange, quotes }: PaperTradeDeskPro
             />
           }
         />
-        <PaperMetric detail="Cash after simulated buys and sells." label="Cash left" value={formatMoney(portfolio.cash)} />
-        <PaperMetric detail="Current marked-to-market value of open paper positions." label="Market value" value={formatMoney(portfolio.marketValue)} />
+        <PaperMetric detail="Cash after simulated buys and sells." label="Buying power" value={formatMoney(portfolio.cash)} />
+        <PaperMetric detail="Current marked-to-market value of open paper positions." label="Exposure" value={formatMoney(portfolio.marketValue)} />
         <PaperMetric
           detail="Cash plus open paper position market value."
           label="Equity"
           tone={portfolio.totalPnl >= 0 ? "positive" : "negative"}
           value={formatMoney(portfolio.equity)}
+        />
+        <PaperMetric
+          detail="Open-position P/L marked against the latest delayed quotes."
+          label="Unrealized P/L"
+          tone={portfolio.unrealizedPnl >= 0 ? "positive" : "negative"}
+          value={formatMoney(portfolio.unrealizedPnl)}
         />
         <PaperMetric
           detail="Equity minus starting cash, including realized and unrealized paper P/L."
@@ -96,12 +137,51 @@ export function PaperTradeDesk({ cash, onCashChange, quotes }: PaperTradeDeskPro
 
       <div className="paper-layout">
         <form className="paper-ticket" onSubmit={submitTrade}>
-          <div className="panel-heading">
-            <span>Trade ticket</span>
-            <InfoTip text="Paper trades are saved locally in IndexedDB. They do not place real orders and never leave your browser." />
+          <div className="ticket-head">
+            <div className="paper-quote-lockup">
+              <span>
+                Active Symbol
+                <InfoTip text="This is the symbol your paper order will use. Changing it also refreshes the working limit price from the delayed quote." />
+              </span>
+              <strong>{selectedSymbol || "No Symbol"}</strong>
+              <em>{selectedName}</em>
+            </div>
+            <button
+              className="open-stock-button"
+              disabled={!selectedQuote}
+              onClick={() => openQuoteForSymbol()}
+              title={selectedQuote ? `Open ${selectedSymbol} stock window` : "No quote available"}
+              type="button"
+            >
+              <ChartLine size={16} />
+              Open stock
+            </button>
           </div>
+
+          <div className="quote-tape" aria-label="Selected paper symbol quote">
+            <div title="Latest delayed quote used to prefill the order price.">
+              <span>Last</span>
+              <strong>{formatPrice(selectedPrice)}</strong>
+            </div>
+            <div title="Current delayed session move for the selected symbol.">
+              <span>Day</span>
+              <strong className={selectedMove >= 0 ? "up" : "down"}>{formatPercent(selectedMove, true)}</strong>
+            </div>
+            <div title="Current paper shares held for this symbol.">
+              <span>Holding</span>
+              <strong>{currentPosition ? `${formatCompact(currentPosition.quantity, 4)} sh` : "Flat"}</strong>
+            </div>
+            <div title="Unrealized paper profit and loss for this symbol.">
+              <span>U P/L</span>
+              <strong className={(currentPosition?.unrealizedPnl ?? 0) >= 0 ? "up" : "down"}>{formatMoney(currentPosition?.unrealizedPnl ?? 0)}</strong>
+            </div>
+          </div>
+
           <label>
-            <span>Symbol</span>
+            <span>
+              Symbol
+              <InfoTip text="Choose the quote attached to this simulated fill. The order will be recorded locally under this ticker." />
+            </span>
             <select value={symbol} onChange={(event) => setSymbol(event.target.value)}>
               {quotes.map((item) => (
                 <option key={item.symbol} value={item.symbol}>
@@ -118,28 +198,69 @@ export function PaperTradeDesk({ cash, onCashChange, quotes }: PaperTradeDeskPro
               Sell
             </button>
           </div>
+
+          <div className="ticket-grid">
+            <label>
+              <span>
+                Quantity
+                <InfoTip text="Share count for the simulated fill. Fractional shares are supported for paper scenarios." />
+              </span>
+              <input min="0" onChange={(event) => setQuantity(Math.max(0, Number(event.target.value) || 0))} step="0.0001" type="number" value={quantity} />
+            </label>
+            <label>
+              <span>
+                Price
+                <InfoTip text="Working paper price for the simulated fill. It starts from the delayed quote but can be edited to model limit fills." />
+              </span>
+              <input min="0" onChange={(event) => setPrice(Math.max(0, Number(event.target.value) || 0))} step="0.01" type="number" value={price} />
+            </label>
+          </div>
+
           <label>
-            <span>Quantity</span>
-            <input min="0" onChange={(event) => setQuantity(Math.max(0, Number(event.target.value) || 0))} step="0.0001" type="number" value={quantity} />
-          </label>
-          <label>
-            <span>Price</span>
-            <input min="0" onChange={(event) => setPrice(Math.max(0, Number(event.target.value) || 0))} step="0.01" type="number" value={price} />
-          </label>
-          <label>
-            <span>Note</span>
+            <span>
+              Note
+              <InfoTip text="Optional local thesis text. It stays in this browser with the paper-trade ledger." />
+            </span>
             <input onChange={(event) => setNote(event.target.value)} placeholder="optional thesis" value={note} />
           </label>
+
+          <div className="ticket-preview" aria-label="Paper order preview">
+            <div>
+              <span>
+                Notional
+                <InfoTip text="Quantity multiplied by the working paper price." />
+              </span>
+              <strong>{formatMoney(orderNotional)}</strong>
+            </div>
+            <div>
+              <span>
+                Cash impact
+                <InfoTip text="Estimated cash movement if this paper fill is recorded. Buys reduce cash; sells add cash." />
+              </span>
+              <strong className={orderImpact >= 0 ? "up" : "down"}>{formatMoney(orderImpact)}</strong>
+            </div>
+            <div>
+              <span>
+                Position return
+                <InfoTip text="Unrealized return for the currently selected paper holding, based on average cost and latest delayed quote." />
+              </span>
+              <strong className={currentReturn >= 0 ? "up" : "down"}>{formatPercent(currentReturn, true)}</strong>
+            </div>
+          </div>
+
           {error ? <strong className="ticket-error">{error}</strong> : null}
           <button className="trade-submit" type="submit">
             <Plus size={17} />
-            Record paper trade
+            Record fill
           </button>
         </form>
 
         <div className="positions-panel">
           <div className="panel-heading">
-            <span>Positions</span>
+            <span>
+              Positions
+              <InfoTip text="Open paper holdings marked to the latest delayed quote. Each card can open the full stock window." />
+            </span>
             <button className="reset-button" disabled={loading || !trades.length} onClick={resetTrades} type="button">
               <Trash2 size={15} />
               Reset
@@ -147,33 +268,49 @@ export function PaperTradeDesk({ cash, onCashChange, quotes }: PaperTradeDeskPro
           </div>
           {portfolio.positions.length ? (
             <div className="positions-grid">
-              {portfolio.positions.map((position) => (
-                <article className="position-card" key={position.symbol}>
-                  <div>
-                    <strong>{position.symbol}</strong>
-                    <span>{position.quote?.name ?? "Saved symbol"}</span>
-                  </div>
-                  <em className={position.unrealizedPnl >= 0 ? "up" : "down"}>{formatMoney(position.unrealizedPnl)}</em>
-                  <dl>
+              {portfolio.positions.map((position) => {
+                const positionQuote = quoteMap.get(position.symbol);
+                const positionReturn = getPositionReturn(position);
+
+                return (
+                  <article className="position-card" key={position.symbol}>
                     <div>
-                      <dt>Qty</dt>
-                      <dd>{formatCompact(position.quantity, 4)}</dd>
+                      <div>
+                        <strong>{position.symbol}</strong>
+                        <span>{position.quote?.name ?? "Saved symbol"}</span>
+                      </div>
+                      <button
+                        className="position-open-button"
+                        disabled={!positionQuote}
+                        onClick={() => openQuoteForSymbol(position.symbol)}
+                        title={positionQuote ? `Open ${position.symbol} stock window` : "No quote available for this saved symbol"}
+                        type="button"
+                      >
+                        <ArrowUpRight size={15} />
+                      </button>
                     </div>
-                    <div>
-                      <dt>Avg</dt>
-                      <dd>{formatPrice(position.averageCost)}</dd>
-                    </div>
-                    <div>
-                      <dt>Value</dt>
-                      <dd>{formatMoney(position.marketValue)}</dd>
-                    </div>
-                    <div>
-                      <dt>Return</dt>
-                      <dd>{formatPercent(position.averageCost ? position.unrealizedPnl / (position.averageCost * position.quantity) : 0, true)}</dd>
-                    </div>
-                  </dl>
-                </article>
-              ))}
+                    <em className={position.unrealizedPnl >= 0 ? "up" : "down"}>{formatMoney(position.unrealizedPnl)}</em>
+                    <dl>
+                      <div title="Open paper share quantity.">
+                        <dt>Qty</dt>
+                        <dd>{formatCompact(position.quantity, 4)}</dd>
+                      </div>
+                      <div title="Average paper cost after all local buys and sells.">
+                        <dt>Avg</dt>
+                        <dd>{formatPrice(position.averageCost)}</dd>
+                      </div>
+                      <div title="Current delayed mark value for this paper position.">
+                        <dt>Value</dt>
+                        <dd>{formatMoney(position.marketValue)}</dd>
+                      </div>
+                      <div title="Unrealized return versus average paper cost.">
+                        <dt>Return</dt>
+                        <dd className={positionReturn >= 0 ? "up" : "down"}>{formatPercent(positionReturn, true)}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="paper-empty">
@@ -187,21 +324,49 @@ export function PaperTradeDesk({ cash, onCashChange, quotes }: PaperTradeDeskPro
 
       <section className="trade-ledger">
         <div className="panel-heading">
-          <span>Ledger</span>
-          <InfoTip text="The ledger is event-sourced: positions, cash, realized P/L, and equity are recalculated from this saved trade list." />
+          <span>
+            Ledger
+            <InfoTip text="The ledger is event-sourced: positions, cash, realized P/L, and equity are recalculated from this saved trade list." />
+          </span>
+          <span className="ledger-count">{trades.length} events</span>
         </div>
         {trades.length ? (
           <div className="ledger-table">
-            {trades.slice(0, 18).map((trade) => (
-              <div className="ledger-row" key={trade.id}>
-                <span>{formatDateTime(trade.timestamp)}</span>
-                <strong>{trade.symbol}</strong>
-                <em className={trade.side === "buy" ? "up" : "down"}>{trade.side}</em>
-                <span>{formatCompact(trade.quantity, 4)} sh</span>
-                <span>{formatPrice(trade.price)}</span>
-                <span>{trade.note || "—"}</span>
-              </div>
-            ))}
+            <div className="ledger-head" aria-hidden="true">
+              <span>Time</span>
+              <span>Symbol</span>
+              <span>Side</span>
+              <span>Qty</span>
+              <span>Price</span>
+              <span>Notional</span>
+              <span>Note</span>
+            </div>
+            {trades.slice(0, 18).map((trade) => {
+              const tradeQuote = quoteMap.get(trade.symbol);
+
+              return (
+                <div className="ledger-row" key={trade.id}>
+                  <span title="Local timestamp for this saved paper fill.">{formatDateTime(trade.timestamp)}</span>
+                  <button
+                    className="ledger-symbol-button"
+                    disabled={!tradeQuote}
+                    onClick={() => openQuoteForSymbol(trade.symbol)}
+                    title={tradeQuote ? `Open ${trade.symbol} stock window` : "No quote available for this saved symbol"}
+                    type="button"
+                  >
+                    <strong>{trade.symbol}</strong>
+                    <ArrowUpRight size={13} />
+                  </button>
+                  <em className={trade.side === "buy" ? "up" : "down"} title="Saved paper trade side.">
+                    {trade.side}
+                  </em>
+                  <span title="Saved simulated share count.">{formatCompact(trade.quantity, 4)} sh</span>
+                  <span title="Saved simulated fill price.">{formatPrice(trade.price)}</span>
+                  <span title="Quantity multiplied by saved fill price.">{formatMoney(trade.quantity * trade.price)}</span>
+                  <span title={trade.note || "No note saved."}>{trade.note || "—"}</span>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="paper-empty compact">
@@ -211,6 +376,11 @@ export function PaperTradeDesk({ cash, onCashChange, quotes }: PaperTradeDeskPro
       </section>
     </section>
   );
+}
+
+function getPositionReturn(position?: PaperPosition) {
+  if (!position?.averageCost || !position.quantity) return 0;
+  return position.unrealizedPnl / (position.averageCost * position.quantity);
 }
 
 function PaperMetric({

@@ -42,10 +42,11 @@
 ## Paper Trading
 
 - Paper trades are saved locally in IndexedDB.
-- Trade ticket records buy/sell, symbol, quantity, price, and optional note.
+- Broker-style order console records buy/sell, symbol, quantity, price, and optional note.
+- The paper workspace can open the expanded stock popup from the active order symbol, position cards, and ledger rows.
 - Portfolio view recalculates cash, market value, equity, unrealized P/L, realized P/L, and total P/L from saved trades.
 - Positions are marked to current delayed quote prices.
-- Ledger shows recent paper trades and can be reset locally.
+- Ledger shows recent paper fills with symbols, side, quantity, price, notional, notes, and local reset controls.
 
 ## About And Privacy
 

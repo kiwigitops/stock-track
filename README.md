@@ -13,7 +13,7 @@ A dark, Apple Stocks-inspired stock tracker with live-feeling delayed quotes, fa
 - Configurable projection settings for forecast horizon, training window, model style, and volume usage.
 - Range filters and hover inspection across all expanded chart/data views.
 - Forward forecast cards from 1D through 1Y, plus trend labels such as bullish, mixed, and bearish.
-- IndexedDB-backed paper trading simulator with trade ticket, local ledger, positions, equity, cash, and P/L.
+- IndexedDB-backed paper trading simulator with broker-style order console, local ledger, positions, equity, cash, P/L, and stock popup links from the paper workspace.
 - About/Privacy area with risk disclosures, local-storage notes, and license information.
 - Uses browser local storage for watchlist, favorites, cached quotes, and cash amount.
 

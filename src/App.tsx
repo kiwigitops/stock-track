@@ -187,7 +187,7 @@ export default function App() {
         {activeView === "about" ? (
           <AboutPanel />
         ) : activeView === "paper" ? (
-          <PaperTradeDesk cash={cash} onCashChange={setCash} quotes={quotes} />
+          <PaperTradeDesk cash={cash} onCashChange={setCash} onOpenQuote={(quote) => setSelected(quote)} quotes={quotes} />
         ) : loading && !quotes.length ? (
           <section className="market-state large">
             <LoaderCircle className="spin" size={26} />
