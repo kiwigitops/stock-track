@@ -2430,6 +2430,7 @@ select option {
 
 .chart-tooltip.floating {
   position: fixed;
+  z-index: 90;
   transform: translate(12px, calc(-100% - 12px));
 }
 

@@ -1,4 +1,5 @@
-import { type PointerEvent, type TouchEvent, useState } from "react";
+import { type PointerEvent, type ReactNode, type TouchEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { BarChart3, Gauge, LineChart } from "lucide-react";
 import {
   candleToRatePoints,
@@ -164,10 +165,10 @@ function BigChart({ points, range: chartRange }: { points: RatePoint[]; range: C
         ) : null}
       </svg>
       {activePoint && tooltip ? (
-        <div className={getTooltipClassName(tooltip)} style={{ left: tooltip.left, top: tooltip.top }}>
+        <ChartTooltipFrame position={tooltip}>
           <span>{activePoint.date}</span>
           <strong>{formatPrice(activePoint.rate)}</strong>
-        </div>
+        </ChartTooltipFrame>
       ) : null}
       <ChartRange end={points[points.length - 1].date} start={points[0].date} summary={`${formatRate(min)} - ${formatRate(max)}`} />
       </div>
@@ -278,13 +279,13 @@ function CandleChart({ candles, range: chartRange }: { candles: StockCandle[]; r
         ) : null}
       </svg>
       {activePoint && tooltip ? (
-        <div className={`${getTooltipClassName(tooltip)} candle-tip`} style={{ left: tooltip.left, top: tooltip.top }}>
+        <ChartTooltipFrame className="candle-tip" position={tooltip}>
           <span>{activePoint.date}</span>
           <strong>{formatPrice(activePoint.close)}</strong>
           <em>O {formatRate(activePoint.open)}</em>
           <em>H {formatRate(activePoint.high)}</em>
           <em>L {formatRate(activePoint.low)}</em>
-        </div>
+        </ChartTooltipFrame>
       ) : null}
       <ChartRange end={candles[candles.length - 1].date} start={candles[0].date} summary={`${formatRate(min)} - ${formatRate(max)}`} />
       </div>
@@ -965,7 +966,7 @@ function GraphHeader({ description, legend = [], title }: { description: string;
 
 function FloatingChartTooltip({ lines, position, title }: { lines: TooltipLine[]; position: ChartTooltipPosition; title: string }) {
   return (
-    <div className={getTooltipClassName(position)} style={{ left: position.left, top: position.top }}>
+    <ChartTooltipFrame position={position}>
       <span>{title}</span>
       {lines.map((line) => (
         <span className={line.label ? "tooltip-line" : ""} key={`${line.label ?? "line"}-${line.value}`}>
@@ -973,7 +974,16 @@ function FloatingChartTooltip({ lines, position, title }: { lines: TooltipLine[]
           <strong>{line.value}</strong>
         </span>
       ))}
-    </div>
+    </ChartTooltipFrame>
+  );
+}
+
+function ChartTooltipFrame({ children, className = "", position }: { children: ReactNode; className?: string; position: ChartTooltipPosition }) {
+  return createPortal(
+    <div className={`${getTooltipClassName(position)} ${className}`.trim()} style={{ left: position.left, top: position.top }}>
+      {children}
+    </div>,
+    document.body,
   );
 }
 
