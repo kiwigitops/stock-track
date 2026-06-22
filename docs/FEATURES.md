@@ -12,6 +12,7 @@
 ## Expanded Stock Modal
 
 - Price, previous close, day high/low, volume, and 52-week range.
+- Previous/next controls move through the current visible stock list without closing the modal.
 - One-year quant metrics: return, annualized volatility, max drawdown, percentile, z-score, and sample count.
 - Dataset cards explain quote source, CORS proxy, local calculations, candle source, modelled depth, and local projections.
 - Broker chart tabs:

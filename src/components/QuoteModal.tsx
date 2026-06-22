@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Gauge, LineChart, Star, X } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, Gauge, LineChart, Star, X } from "lucide-react";
 import { candleToRatePoints, getStats } from "../lib/analytics";
 import { DEFAULT_ML_SETTINGS, ML_SETTINGS_KEY } from "../lib/constants";
 import { formatCompact, formatMoney, formatPercent, formatPrice, formatRate, venueName } from "../lib/format";
@@ -12,26 +12,33 @@ import { BrokerWorkspace } from "./charts/BrokerWorkspace";
 type QuoteModalProps = {
   cash: number;
   isFavorite: boolean;
+  navLabel?: string;
   onClose: () => void;
   onFavorite: () => void;
+  onNext?: () => void;
+  onPrevious?: () => void;
   quote: StockQuote;
 };
 
 const chartModes: ChartMode[] = ["candles", "line", "returns", "technicals", "risk", "depth", "projections"];
 const chartRanges: ChartRangeKey[] = ["1m", "3m", "6m", "1y", "5y"];
 
-export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: QuoteModalProps) {
+export function QuoteModal({ cash, isFavorite, navLabel, onClose, onFavorite, onNext, onPrevious, quote }: QuoteModalProps) {
   const [chartMode, setChartMode] = useState<ChartMode>("candles");
   const [chartRange, setChartRange] = useState<ChartRangeKey>("1y");
   const [mlSettings, setMlSettings] = usePersistentState<MlSettings>(ML_SETTINGS_KEY, DEFAULT_ML_SETTINGS);
+  const canNavigate = Boolean(onNext && onPrevious);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
+      if (isFormTarget(event.target)) return;
+      if (event.key === "ArrowLeft" && onPrevious) onPrevious();
+      if (event.key === "ArrowRight" && onNext) onNext();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, onNext, onPrevious]);
 
   const ratePoints = useMemo(() => candleToRatePoints(quote.candles), [quote.candles]);
   const visibleRatePoints = useMemo(() => ratePoints.slice(-252), [ratePoints]);
@@ -54,6 +61,13 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
             </h2>
           </div>
           <div className="modal-actions">
+            <button className="glass-icon" disabled={!canNavigate} onClick={onPrevious} title="Previous stock">
+              <ChevronLeft size={19} />
+            </button>
+            {navLabel ? <span className="modal-position">{navLabel}</span> : null}
+            <button className="glass-icon" disabled={!canNavigate} onClick={onNext} title="Next stock">
+              <ChevronRight size={19} />
+            </button>
             <button className="glass-icon" onClick={onFavorite} title={isFavorite ? "Unfavorite" : "Favorite"}>
               <Star size={18} fill={isFavorite ? "currentColor" : "none"} />
             </button>
@@ -271,6 +285,11 @@ export function QuoteModal({ cash, isFavorite, onClose, onFavorite, quote }: Quo
       </section>
     </div>
   );
+}
+
+function isFormTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName) || target.isContentEditable;
 }
 
 function getChartModeLabel(mode: ChartMode) {

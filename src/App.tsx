@@ -54,6 +54,8 @@ export default function App() {
     if (!orderedQuotes.length) return 0.5;
     return orderedQuotes.slice(0, 12).reduce((sum, quote) => sum + Math.abs(quote.changePercent * 100), 0) / Math.min(12, orderedQuotes.length);
   }, [orderedQuotes]);
+  const selectedIndex = selected ? orderedQuotes.findIndex((quote) => quote.symbol === selected.symbol) : -1;
+  const selectedPosition = selectedIndex >= 0 ? `${selectedIndex + 1}/${orderedQuotes.length}` : "";
   const feedClass = stale ? "feed-pill stale" : refreshing ? "feed-pill syncing" : "feed-pill live";
   const feedLabel = stale ? "Cached" : refreshing ? "Syncing" : "Live";
 
@@ -67,6 +69,13 @@ export default function App() {
     if (!symbol) return;
     setCustomSymbols((current) => (current.includes(symbol) ? current : [symbol, ...current]));
     setNewSymbol("");
+  }
+
+  function selectNeighbor(direction: -1 | 1) {
+    if (!orderedQuotes.length) return;
+    const currentIndex = selected ? orderedQuotes.findIndex((quote) => quote.symbol === selected.symbol) : -1;
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + direction + orderedQuotes.length) % orderedQuotes.length;
+    setSelected(orderedQuotes[nextIndex]);
   }
 
   return (
@@ -196,8 +205,11 @@ export default function App() {
         <QuoteModal
           cash={cash}
           isFavorite={favoritesSet.has(selected.symbol)}
+          navLabel={selectedPosition}
           onClose={() => setSelected(null)}
           onFavorite={() => toggleFavorite(selected.symbol)}
+          onNext={orderedQuotes.length > 1 ? () => selectNeighbor(1) : undefined}
+          onPrevious={orderedQuotes.length > 1 ? () => selectNeighbor(-1) : undefined}
           quote={selected}
         />
       ) : null}
