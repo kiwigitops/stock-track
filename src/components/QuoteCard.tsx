@@ -18,11 +18,11 @@ export function QuoteCard({ cash, chartRange, isFavorite, onFavorite, onOpen, qu
 
   return (
     <article className="quote-card">
-      <button className="favorite-chip" onClick={onFavorite} title={isFavorite ? "Unfavorite" : "Favorite"}>
+      <button aria-label={isFavorite ? `Remove ${quote.symbol} from favorites` : `Add ${quote.symbol} to favorites`} className="favorite-chip" onClick={onFavorite}>
         <Star size={15} fill={isFavorite ? "currentColor" : "none"} />
       </button>
 
-      <button className="quote-open" onClick={onOpen} title={`Open ${quote.symbol} expanded chart view`}>
+      <button aria-label={`Open ${quote.symbol} expanded chart view`} className="quote-open" onClick={onOpen}>
         <span className="card-region">{venueName(quote.exchange)}</span>
         <div className="symbol-line">
           <strong>{quote.symbol}</strong>

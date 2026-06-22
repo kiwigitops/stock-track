@@ -27,7 +27,7 @@ export function FocusStage({ cash, chartRange, headline, onOpen, quotes }: Focus
 
   return (
     <section className="focus-stage" aria-label="Focused stock market">
-      <button className="focus-panel" onClick={() => onOpen(headline)} title={`Open ${headline.symbol} expanded chart view`}>
+      <button aria-label={`Open ${headline.symbol} expanded chart view`} className="focus-panel" onClick={() => onOpen(headline)}>
         <div className="focus-kicker">
           <span>{venueName(headline.exchange)}</span>
           <em className={headline.change < 0 ? "down" : "up"}>{formatPercent(headline.changePercent, true)}</em>
@@ -53,7 +53,7 @@ export function FocusStage({ cash, chartRange, headline, onOpen, quotes }: Focus
           <strong>{formatDateTime(headline.updatedAt)}</strong>
         </div>
         {quotes.map((quote) => (
-          <button key={quote.symbol} onClick={() => onOpen(quote)} title={`Open ${quote.symbol} expanded chart view`}>
+          <button aria-label={`Open ${quote.symbol} expanded chart view`} key={quote.symbol} onClick={() => onOpen(quote)}>
             <div>
               <strong>{quote.symbol}</strong>
               <span>{quote.name}</span>
