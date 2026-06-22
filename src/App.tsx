@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Gauge, LoaderCircle, Plus, RefreshCcw, Search, Star } from "lucide-react";
 import MarketScene from "./MarketScene";
+import { AboutPanel } from "./components/AboutPanel";
 import { FocusStage } from "./components/FocusStage";
 import { PaperTradeDesk } from "./components/PaperTradeDesk";
 import { QuoteCard } from "./components/QuoteCard";
@@ -19,7 +20,7 @@ export default function App() {
   const [newSymbol, setNewSymbol] = useState("");
   const [selected, setSelected] = useState<StockQuote | null>(null);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [activeView, setActiveView] = useState<"market" | "paper">("market");
+  const [activeView, setActiveView] = useState<"about" | "market" | "paper">("market");
 
   const symbols = useMemo(() => {
     return Array.from(new Set([...favorites, ...WATCHLIST, ...customSymbols].map(normalizeSymbol).filter(Boolean)));
@@ -101,6 +102,9 @@ export default function App() {
           <button className={activeView === "paper" ? "active" : ""} onClick={() => setActiveView("paper")}>
             Paper
           </button>
+          <button className={activeView === "about" ? "active" : ""} onClick={() => setActiveView("about")}>
+            About
+          </button>
         </div>
 
         {activeView === "market" ? (
@@ -154,7 +158,9 @@ export default function App() {
           </section>
         ) : null}
 
-        {activeView === "paper" ? (
+        {activeView === "about" ? (
+          <AboutPanel />
+        ) : activeView === "paper" ? (
           <PaperTradeDesk cash={cash} onCashChange={setCash} quotes={quotes} />
         ) : loading && !quotes.length ? (
           <section className="market-state large">

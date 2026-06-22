@@ -7,6 +7,7 @@
 - Search filters symbols by ticker or company name.
 - Cash amount is shared by watch cards and paper trading.
 - Full-screen Three.js market scene responds to market direction.
+- Top-level tabs switch between Market, Paper, and About.
 
 ## Expanded Stock Modal
 
@@ -37,16 +38,22 @@
 
 ## Paper Trading
 
-- Market/Paper workspace tabs at the top level.
 - Paper trades are saved locally in IndexedDB.
 - Trade ticket records buy/sell, symbol, quantity, price, and optional note.
 - Portfolio view recalculates cash, market value, equity, unrealized P/L, realized P/L, and total P/L from saved trades.
 - Positions are marked to current delayed quote prices.
 - Ledger shows recent paper trades and can be reset locally.
 
+## About And Privacy
+
+- About workspace explains that Stock Track is not a broker, adviser, research provider, or trading system.
+- Risk disclosures cover delayed quotes, experimental projections, paper-trade simulation, and use-at-your-own-risk operation.
+- Privacy notes explain local storage, IndexedDB paper trades, public quote/proxy requests, and absence of accounts or project-controlled backend storage.
+- License notes point to the standard MIT License and clarify that product disclosures do not modify the license terms.
+
 ## Data Notes
 
 - Quotes and OHLC history come from Yahoo Finance's public chart endpoint through `corsproxy.io`.
 - The app fetches five years of daily candles so longer projection horizons have enough history.
 - Visible quant stats remain focused on the latest one-year window.
-- The projection panel is exploratory and local. It is not financial advice or a real prediction engine.
+- The projection panel is exploratory and local. It is not financial advice, a recommendation engine, or a real prediction engine.

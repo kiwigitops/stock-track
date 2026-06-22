@@ -2,10 +2,11 @@
 
 ## Top-Level Flow
 
-- `src/App.tsx` owns global UI state: cash amount, favorites, custom symbols, market/paper workspace tab, selected stock modal, search, and feed status.
+- `src/App.tsx` owns global UI state: cash amount, favorites, custom symbols, market/paper/about workspace tab, selected stock modal, search, and feed status.
 - `src/hooks/useStocks.ts` refreshes delayed quote data, caches quotes in local storage, and keeps the UI usable when refreshes fail.
 - `src/services/stocks.ts` is the quote adapter. It converts Yahoo Finance chart responses into `StockQuote` and `StockCandle` objects.
 - `src/MarketScene.tsx` owns the Three.js background and stays independent from stock domain logic.
+- `src/components/AboutPanel.tsx` owns the in-app privacy, risk, projection, and license disclosures.
 
 ## Modal And Charts
 
@@ -40,11 +41,17 @@
 - IndexedDB is used for paper-trade ledger events.
 - No backend server is required.
 
+## License And Disclosures
+
+- `LICENSE` contains the standard MIT License text.
+- The app and README keep finance, projection, privacy, and use-at-your-own-risk language as disclosures outside the license text.
+
 ## Verification
 
 - `pnpm build` runs TypeScript and production build checks.
 - Browser QA should cover:
   - Market cards load.
+  - About tab renders privacy, risk, and license content.
   - Modal opens.
   - All chart tabs render.
   - Range filters update every chart/data view.

@@ -13,6 +13,7 @@ A dark, Apple Stocks-inspired stock tracker with live-feeling delayed quotes, fa
 - Range filters and hover inspection across all expanded chart/data views.
 - Forward forecast cards from 1D through 1Y, plus trend labels such as bullish, mixed, and bearish.
 - IndexedDB-backed paper trading simulator with trade ticket, local ledger, positions, equity, cash, and P/L.
+- About/Privacy area with risk disclosures, local-storage notes, and license information.
 - Uses browser local storage for watchlist, favorites, cached quotes, and cash amount.
 
 ## Data Sources
@@ -22,7 +23,32 @@ A dark, Apple Stocks-inspired stock tracker with live-feeling delayed quotes, fa
 
 No API key is required for the default setup. The data adapter is isolated in `src/services/stocks.ts` so a paid or official feed can replace it later.
 
-The projection panel is intentionally lightweight and explainable. It trains only on the loaded daily candles for the selected ticker and should be treated as an exploratory quant signal, not financial advice.
+## Disclaimers
+
+Stock Track is for exploration, learning, visualization, and paper-trade simulation. It is not a broker, investment adviser,
+research provider, or trading system. Nothing in this repository or app is financial, investment, tax, legal, or trading
+advice. This is not financial advice.
+
+Use this software and any outputs at your own risk. Quotes may be delayed, incomplete, stale, wrong, or unavailable.
+Projection signals are experimental browser-side calculations from historical candles. They are not predictions, guarantees,
+or recommendations. You are responsible for your own research, decisions, trades, losses, and use of the app.
+
+Paper trading is simulated locally and never places real orders.
+
+## Privacy
+
+Stock Track has no accounts, authentication, analytics, ads, or project-controlled backend database. Favorites, custom
+symbols, cash amount, projection settings, cached quotes, and other preferences are stored in your browser. Paper-trade
+entries are stored locally in IndexedDB with a local storage fallback. Clearing browser site data removes local app data.
+
+The default quote adapter requests delayed market data from public endpoints through a public CORS proxy. Those third-party
+providers may receive ticker symbols and normal network metadata and may have their own logging, terms, and rate limits.
+
+## License
+
+Stock Track is released under the MIT License. The MIT license text is kept standard and includes the usual as-is,
+no-warranty software disclaimer. The finance/projections/privacy language above is product disclosure text, not custom
+license terms. See [LICENSE](LICENSE).
 
 ## Docs
 
