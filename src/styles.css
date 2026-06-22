@@ -83,9 +83,9 @@ button {
 }
 
 .app-frame {
-  width: min(1480px, calc(100% - var(--space-8)));
+  width: min(1360px, calc(100% - var(--space-8)));
   margin: 0 auto;
-  padding: var(--space-7) 0 var(--space-8);
+  padding: var(--space-6) 0 var(--space-8);
 }
 
 .hero {
@@ -172,8 +172,8 @@ p {
 
 h1 {
   margin-top: 2px;
-  font-size: clamp(2.2rem, 5vw, 5.8rem);
-  line-height: 0.92;
+  font-size: clamp(2rem, 4vw, 4.55rem);
+  line-height: 0.94;
   letter-spacing: 0;
 }
 
@@ -226,9 +226,10 @@ em {
 
 .focus-stage {
   display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(340px, 0.82fr);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 0.72fr);
   gap: var(--space-3);
-  margin-top: var(--space-6);
+  margin-top: var(--space-5);
 }
 
 .focus-panel,
@@ -251,9 +252,9 @@ em {
 
 .focus-panel {
   position: relative;
-  min-height: 288px;
+  min-height: 248px;
   overflow: hidden;
-  padding: var(--space-5);
+  padding: var(--space-4);
   color: inherit;
   text-align: left;
 }
@@ -263,11 +264,12 @@ em {
   z-index: 0;
   right: -8%;
   bottom: -16%;
-  width: 62%;
-  height: 48%;
-  border-top: 1px solid rgba(49, 209, 88, 0.42);
-  border-left: 1px solid rgba(100, 210, 255, 0.24);
+  width: 52%;
+  height: 34%;
+  border-top: 1px solid rgba(49, 209, 88, 0.24);
+  border-left: 1px solid rgba(100, 210, 255, 0.14);
   content: "";
+  opacity: 0.62;
   pointer-events: none;
   transform: skewY(-9deg);
 }
@@ -309,8 +311,8 @@ em {
   display: block;
   margin-top: var(--space-2);
   color: #ffffff;
-  font-size: clamp(3.7rem, 8vw, 8.4rem);
-  line-height: 0.86;
+  font-size: clamp(3.2rem, 6.4vw, 6.8rem);
+  line-height: 0.88;
 }
 
 .focus-name {
@@ -322,13 +324,13 @@ em {
 }
 
 .focus-panel .spark-shell {
-  margin: 14px 0 10px;
+  margin: 10px 0 8px;
 }
 
 .focus-bottom {
   position: relative;
   z-index: 1;
-  padding-top: var(--space-3);
+  padding-top: var(--space-2);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -336,7 +338,7 @@ em {
   display: block;
   margin-top: 4px;
   color: #ffffff;
-  font-size: clamp(1.35rem, 3vw, 2.3rem);
+  font-size: clamp(1.25rem, 2.4vw, 2rem);
   line-height: 1;
 }
 
@@ -345,8 +347,8 @@ em {
 }
 
 .focus-rail {
-  min-height: 288px;
-  padding: var(--space-4);
+  min-height: 248px;
+  padding: var(--space-3);
 }
 
 .rail-head {
@@ -620,7 +622,7 @@ select option {
 
 .quote-open {
   width: 100%;
-  min-height: 208px;
+  min-height: 190px;
   padding: var(--space-4);
   border: 0;
   color: inherit;
@@ -709,22 +711,22 @@ select option {
 
 .spark-chart {
   position: relative;
-  min-height: 54px;
+  min-height: 48px;
 }
 
 .spark-shell.focus .spark-chart {
-  min-height: 64px;
+  min-height: 52px;
 }
 
 .spark {
   display: block;
   width: 100%;
-  height: 54px;
+  height: 48px;
   cursor: crosshair;
 }
 
 .spark-shell.focus .spark {
-  height: 64px;
+  height: 52px;
 }
 
 .spark-line,
@@ -740,7 +742,7 @@ select option {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.2;
+  stroke-width: 1.7;
   stroke-dasharray: 1;
   stroke-dashoffset: 0;
   vector-effect: non-scaling-stroke;
@@ -748,23 +750,23 @@ select option {
 }
 
 .spark-shell.focus .spark-line {
-  stroke-width: 2.6;
+  stroke-width: 2;
 }
 
 .spark-area {
-  opacity: 0.82;
+  opacity: 0.46;
   animation: fade-up 420ms var(--ease-out);
 }
 
 .spark-grid {
-  stroke: rgba(245, 247, 251, 0.1);
+  stroke: rgba(245, 247, 251, 0.075);
   stroke-width: 0.8;
   vector-effect: non-scaling-stroke;
 }
 
 .spark-axis {
-  fill: rgba(245, 247, 251, 0.44);
-  font-size: 5px;
+  fill: rgba(245, 247, 251, 0.36);
+  font-size: 3.5px;
   font-weight: 850;
   text-transform: uppercase;
 }
@@ -2581,7 +2583,7 @@ select option {
 
 @media (max-width: 1080px) {
   .focus-stage {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.55fr);
   }
 
   .focus-rail {
@@ -2648,10 +2650,16 @@ select option {
   }
 }
 
+@media (max-width: 900px) {
+  .focus-stage {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 700px) {
   .app-frame {
-    width: min(100% - 20px, 1480px);
-    padding-top: 18px;
+    width: min(100% - 20px, 1360px);
+    padding-top: 16px;
   }
 
   .top-nav {
@@ -2682,12 +2690,12 @@ select option {
   }
 
   .focus-panel {
-    min-height: 260px;
-    padding: 18px;
+    min-height: 232px;
+    padding: 16px;
   }
 
   .focus-symbol {
-    font-size: clamp(3.1rem, 17vw, 5.2rem);
+    font-size: clamp(2.8rem, 15vw, 4.7rem);
   }
 
   .focus-bottom {

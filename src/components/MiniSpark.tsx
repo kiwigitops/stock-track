@@ -114,7 +114,7 @@ export function MiniSpark({ candles, currency, range, symbol, variant = "card" }
           {activePoint ? (
             <>
               <line className="spark-focus-line" x1={activePoint.x} x2={activePoint.x} y1="6" y2="42" />
-              <circle className="spark-marker" cx={activePoint.x} cy={activePoint.y} r="3.4" />
+              <circle className="spark-marker" cx={activePoint.x} cy={activePoint.y} r="2.4" />
             </>
           ) : null}
         </svg>
