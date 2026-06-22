@@ -13,7 +13,7 @@ A dark, Apple Stocks-inspired stock tracker with live-feeling delayed quotes, fa
 - Configurable projection settings for forecast horizon, training window, model style, and volume usage.
 - Range filters and hover inspection across all expanded chart/data views.
 - Forward forecast cards from 1D through 1Y, plus trend labels such as bullish, mixed, and bearish.
-- IndexedDB-backed paper trading simulator with broker-style order console, local ledger, positions, equity, cash, P/L, and stock popup links from the paper workspace.
+- IndexedDB-backed paper trading simulator with broker-style order console, market/limit/stop/stop-limit instructions, stop-loss/take-profit/trailing-stop plans, local ledger, positions, equity, cash, P/L, and stock popup links from the paper workspace.
 - About/Privacy area with risk disclosures, local-storage notes, and license information.
 - Uses browser local storage for watchlist, favorites, cached quotes, and cash amount.
 
@@ -34,7 +34,8 @@ Use this software and any outputs at your own risk. Quotes may be delayed, incom
 Projection signals are experimental browser-side calculations from historical candles. They are not predictions, guarantees,
 or recommendations. You are responsible for your own research, decisions, trades, losses, and use of the app.
 
-Paper trading is simulated locally and never places real orders.
+Paper trading is simulated locally and never places real orders. Stop-loss, take-profit, trailing-stop, limit, and stop
+fields are saved as local simulator instructions only; they are not monitored or executed by a broker.
 
 ## Privacy
 

@@ -2,15 +2,24 @@ import { normalizeSymbol } from "./format";
 import type { StockQuote } from "../types";
 
 export type PaperTradeSide = "buy" | "sell";
+export type PaperOrderType = "limit" | "market" | "stop" | "stopLimit";
+export type PaperTimeInForce = "day" | "gtc";
 
 export type PaperTrade = {
   id: string;
+  limitPrice?: number;
   note: string;
+  orderType?: PaperOrderType;
   price: number;
   quantity: number;
   side: PaperTradeSide;
+  stopLoss?: number;
+  stopPrice?: number;
   symbol: string;
+  takeProfit?: number;
+  timeInForce?: PaperTimeInForce;
   timestamp: number;
+  trailingStopPercent?: number;
 };
 
 export type PaperPosition = {
@@ -41,12 +50,24 @@ export function createPaperTrade(input: Omit<PaperTrade, "id" | "timestamp">): P
   return {
     ...input,
     id: crypto.randomUUID(),
+    limitPrice: cleanOptionalNumber(input.limitPrice),
     note: input.note.trim(),
+    orderType: input.orderType ?? "market",
     price: Math.max(0, input.price),
     quantity: Math.max(0, input.quantity),
+    stopLoss: cleanOptionalNumber(input.stopLoss),
+    stopPrice: cleanOptionalNumber(input.stopPrice),
     symbol: normalizeSymbol(input.symbol),
+    takeProfit: cleanOptionalNumber(input.takeProfit),
+    timeInForce: input.timeInForce ?? "day",
     timestamp: Date.now(),
+    trailingStopPercent: cleanOptionalNumber(input.trailingStopPercent),
   };
+}
+
+function cleanOptionalNumber(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  return Math.max(0, value);
 }
 
 export function getPaperPortfolio(trades: PaperTrade[], quotes: StockQuote[], startingCash: number): PaperPortfolio {

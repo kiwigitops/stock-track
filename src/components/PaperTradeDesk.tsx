@@ -1,7 +1,15 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Briefcase, ChartLine, Plus, ReceiptText, RotateCcw, Trash2, Wallet } from "lucide-react";
 import { formatCompact, formatDateTime, formatMoney, formatPercent, formatPrice, normalizeSymbol } from "../lib/format";
-import { createPaperTrade, getPaperPortfolio, type PaperPosition, type PaperTradeSide } from "../lib/paperTrading";
+import {
+  createPaperTrade,
+  getPaperPortfolio,
+  type PaperOrderType,
+  type PaperPosition,
+  type PaperTimeInForce,
+  type PaperTrade,
+  type PaperTradeSide,
+} from "../lib/paperTrading";
 import { usePaperTrades } from "../hooks/usePaperTrades";
 import type { StockQuote } from "../types";
 import { InfoTip } from "./InfoTip";
@@ -13,26 +21,57 @@ type PaperTradeDeskProps = {
   quotes: StockQuote[];
 };
 
+const ORDER_TYPE_LABELS: Record<PaperOrderType, string> = {
+  limit: "Limit",
+  market: "Market",
+  stop: "Stop",
+  stopLimit: "Stop limit",
+};
+
+const TIME_IN_FORCE_LABELS: Record<PaperTimeInForce, string> = {
+  day: "Day",
+  gtc: "GTC",
+};
+
 export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: PaperTradeDeskProps) {
   const { addTrade, loading, resetTrades, trades } = usePaperTrades();
   const [symbol, setSymbol] = useState(() => quotes[0]?.symbol ?? "AAPL");
   const [side, setSide] = useState<PaperTradeSide>("buy");
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState(() => quotes[0]?.price ?? 0);
+  const [orderType, setOrderType] = useState<PaperOrderType>("market");
+  const [timeInForce, setTimeInForce] = useState<PaperTimeInForce>("day");
+  const [limitPrice, setLimitPrice] = useState("");
+  const [stopPrice, setStopPrice] = useState("");
+  const [stopLoss, setStopLoss] = useState("");
+  const [takeProfit, setTakeProfit] = useState("");
+  const [trailingStopPercent, setTrailingStopPercent] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const quoteMap = useMemo(() => new Map(quotes.map((quote) => [quote.symbol, quote])), [quotes]);
   const quote = quoteMap.get(symbol);
   const portfolio = useMemo(() => getPaperPortfolio(trades, quotes, cash), [cash, quotes, trades]);
+  const latestPlanBySymbol = useMemo(() => getLatestPlanBySymbol(trades), [trades]);
   const currentPosition = portfolio.positions.find((position) => position.symbol === symbol);
   const selectedQuote = quote ?? quotes[0];
   const selectedSymbol = selectedQuote?.symbol ?? normalizeSymbol(symbol);
   const selectedName = selectedQuote?.name ?? "Saved symbol";
   const selectedPrice = selectedQuote?.price ?? price;
   const selectedMove = selectedQuote?.changePercent ?? 0;
+  const plannedLimitPrice = parseOptionalNumber(limitPrice);
+  const plannedStopPrice = parseOptionalNumber(stopPrice);
+  const plannedStopLoss = parseOptionalNumber(stopLoss);
+  const plannedTakeProfit = parseOptionalNumber(takeProfit);
+  const plannedTrailingStopPercent = parseOptionalNumber(trailingStopPercent);
   const orderNotional = quantity * price;
   const orderImpact = side === "buy" ? -orderNotional : orderNotional;
   const currentReturn = getPositionReturn(currentPosition);
+  const ticketRisk = getRiskMetrics({
+    price,
+    quantity,
+    stopLoss: plannedStopLoss,
+    takeProfit: plannedTakeProfit,
+  });
 
   useEffect(() => {
     if (quote) setPrice(roundMoney(quote.price));
@@ -53,6 +92,31 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
       return;
     }
 
+    if ((orderType === "limit" || orderType === "stopLimit") && !plannedLimitPrice) {
+      setError("Enter a limit price for this paper order.");
+      return;
+    }
+
+    if ((orderType === "stop" || orderType === "stopLimit") && !plannedStopPrice) {
+      setError("Enter a stop trigger for this paper order.");
+      return;
+    }
+
+    if (side === "buy" && plannedStopLoss && plannedStopLoss >= cleanPrice) {
+      setError("For a buy plan, stop loss should sit below the fill price.");
+      return;
+    }
+
+    if (side === "buy" && plannedTakeProfit && plannedTakeProfit <= cleanPrice) {
+      setError("For a buy plan, take profit should sit above the fill price.");
+      return;
+    }
+
+    if (plannedTrailingStopPercent && plannedTrailingStopPercent > 100) {
+      setError("Trailing stop should be 100% or less.");
+      return;
+    }
+
     if (side === "sell" && cleanQuantity > (currentPosition?.quantity ?? 0)) {
       setError("Sell size is larger than the current paper position.");
       return;
@@ -60,11 +124,18 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
 
     await addTrade(
       createPaperTrade({
+        limitPrice: plannedLimitPrice,
         note,
+        orderType,
         price: cleanPrice,
         quantity: cleanQuantity,
         side,
+        stopLoss: plannedStopLoss,
+        stopPrice: plannedStopPrice,
         symbol: cleanSymbol,
+        takeProfit: plannedTakeProfit,
+        timeInForce,
+        trailingStopPercent: plannedTrailingStopPercent,
       }),
     );
     setError("");
@@ -199,6 +270,54 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
             </button>
           </div>
 
+          <div className="order-options">
+            <label>
+              <span>
+                Order type
+                <InfoTip text="Market fills immediately in this simulator. Limit, stop, and stop-limit save your intended trigger instructions with the paper fill." />
+              </span>
+              <select value={orderType} onChange={(event) => setOrderType(event.target.value as PaperOrderType)}>
+                <option value="market">Market</option>
+                <option value="limit">Limit</option>
+                <option value="stop">Stop</option>
+                <option value="stopLimit">Stop limit</option>
+              </select>
+            </label>
+            <label>
+              <span>
+                Time in force
+                <InfoTip text="Day and GTC are recorded as simulator instructions. They do not create real broker orders or background triggers." />
+              </span>
+              <select value={timeInForce} onChange={(event) => setTimeInForce(event.target.value as PaperTimeInForce)}>
+                <option value="day">Day</option>
+                <option value="gtc">GTC</option>
+              </select>
+            </label>
+          </div>
+
+          {orderType !== "market" ? (
+            <div className="ticket-grid order-trigger-grid">
+              {orderType === "limit" || orderType === "stopLimit" ? (
+                <label>
+                  <span>
+                    Limit price
+                    <InfoTip text="The price you wanted for a limit or stop-limit order. The simulator records it with the fill." />
+                  </span>
+                  <input inputMode="decimal" min="0" onChange={(event) => setLimitPrice(event.target.value)} placeholder={formatPrice(price)} step="0.01" type="number" value={limitPrice} />
+                </label>
+              ) : null}
+              {orderType === "stop" || orderType === "stopLimit" ? (
+                <label>
+                  <span>
+                    Stop trigger
+                    <InfoTip text="The trigger level for a stop or stop-limit order. It is saved as paper order context." />
+                  </span>
+                  <input inputMode="decimal" min="0" onChange={(event) => setStopPrice(event.target.value)} placeholder={formatPrice(price)} step="0.01" type="number" value={stopPrice} />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="ticket-grid">
             <label>
               <span>
@@ -216,6 +335,38 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
             </label>
           </div>
 
+          <div className="bracket-panel">
+            <div className="panel-heading compact-heading">
+              <span>
+                Bracket and risk
+                <InfoTip text="Optional local stop-loss, take-profit, and trailing-stop plan attached to this paper fill. The app displays the plan but does not auto-execute exits in the background." />
+              </span>
+            </div>
+            <div className="bracket-grid">
+              <label>
+                <span>
+                  Stop loss
+                  <InfoTip text="Planned exit level if the trade goes against you. For buy plans, keep it below the fill price." />
+                </span>
+                <input inputMode="decimal" min="0" onChange={(event) => setStopLoss(event.target.value)} placeholder="optional" step="0.01" type="number" value={stopLoss} />
+              </label>
+              <label>
+                <span>
+                  Take profit
+                  <InfoTip text="Planned target level used to estimate reward and reward/risk." />
+                </span>
+                <input inputMode="decimal" min="0" onChange={(event) => setTakeProfit(event.target.value)} placeholder="optional" step="0.01" type="number" value={takeProfit} />
+              </label>
+              <label>
+                <span>
+                  Trail %
+                  <InfoTip text="Optional trailing-stop percentage. It is stored with the paper fill as a plan note." />
+                </span>
+                <input inputMode="decimal" min="0" onChange={(event) => setTrailingStopPercent(event.target.value)} placeholder="optional" step="0.1" type="number" value={trailingStopPercent} />
+              </label>
+            </div>
+          </div>
+
           <label>
             <span>
               Note
@@ -225,6 +376,13 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
           </label>
 
           <div className="ticket-preview" aria-label="Paper order preview">
+            <div>
+              <span>
+                Order
+                <InfoTip text="Saved paper order instruction: order type, time in force, and any trigger prices." />
+              </span>
+              <strong>{formatOrderLabel({ orderType, timeInForce, limitPrice: plannedLimitPrice, stopPrice: plannedStopPrice })}</strong>
+            </div>
             <div>
               <span>
                 Notional
@@ -245,6 +403,20 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
                 <InfoTip text="Unrealized return for the currently selected paper holding, based on average cost and latest delayed quote." />
               </span>
               <strong className={currentReturn >= 0 ? "up" : "down"}>{formatPercent(currentReturn, true)}</strong>
+            </div>
+            <div>
+              <span>
+                Risk
+                <InfoTip text="Estimated risk from fill price to stop loss, multiplied by quantity." />
+              </span>
+              <strong className={ticketRisk.riskAmount ? "down" : ""}>{ticketRisk.riskAmount ? formatMoney(ticketRisk.riskAmount) : "No stop"}</strong>
+            </div>
+            <div>
+              <span>
+                Reward/risk
+                <InfoTip text="Potential target reward divided by estimated stop risk." />
+              </span>
+              <strong>{formatRewardRisk(ticketRisk.rewardRisk)}</strong>
             </div>
           </div>
 
@@ -271,6 +443,13 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
               {portfolio.positions.map((position) => {
                 const positionQuote = quoteMap.get(position.symbol);
                 const positionReturn = getPositionReturn(position);
+                const planTrade = latestPlanBySymbol.get(position.symbol);
+                const planRisk = getRiskMetrics({
+                  price: position.averageCost,
+                  quantity: position.quantity,
+                  stopLoss: planTrade?.stopLoss,
+                  takeProfit: planTrade?.takeProfit,
+                });
 
                 return (
                   <article className="position-card" key={position.symbol}>
@@ -308,6 +487,13 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
                         <dd className={positionReturn >= 0 ? "up" : "down"}>{formatPercent(positionReturn, true)}</dd>
                       </div>
                     </dl>
+                    {planTrade ? (
+                      <div className="position-plan" title="Latest saved paper bracket plan for this open symbol.">
+                        <span>Plan</span>
+                        <strong>{formatBracketSummary(planTrade)}</strong>
+                        <em>{planRisk.riskAmount ? `${formatMoney(planRisk.riskAmount)} risk / ${formatRewardRisk(planRisk.rewardRisk)}` : "Bracket saved"}</em>
+                      </div>
+                    ) : null}
                   </article>
                 );
               })}
@@ -336,13 +522,21 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
               <span>Time</span>
               <span>Symbol</span>
               <span>Side</span>
+              <span>Order</span>
               <span>Qty</span>
               <span>Price</span>
               <span>Notional</span>
+              <span>Risk</span>
               <span>Note</span>
             </div>
             {trades.slice(0, 18).map((trade) => {
               const tradeQuote = quoteMap.get(trade.symbol);
+              const tradeRisk = getRiskMetrics({
+                price: trade.price,
+                quantity: trade.quantity,
+                stopLoss: trade.stopLoss,
+                takeProfit: trade.takeProfit,
+              });
 
               return (
                 <div className="ledger-row" key={trade.id}>
@@ -360,9 +554,11 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
                   <em className={trade.side === "buy" ? "up" : "down"} title="Saved paper trade side.">
                     {trade.side}
                   </em>
+                  <span title={formatOrderLabel(trade)}>{formatOrderLabel(trade)}</span>
                   <span title="Saved simulated share count.">{formatCompact(trade.quantity, 4)} sh</span>
                   <span title="Saved simulated fill price.">{formatPrice(trade.price)}</span>
                   <span title="Quantity multiplied by saved fill price.">{formatMoney(trade.quantity * trade.price)}</span>
+                  <span title={formatBracketSummary(trade)}>{tradeRisk.riskAmount ? `${formatMoney(tradeRisk.riskAmount)} / ${formatRewardRisk(tradeRisk.rewardRisk)}` : formatBracketSummary(trade)}</span>
                   <span title={trade.note || "No note saved."}>{trade.note || "—"}</span>
                 </div>
               );
@@ -381,6 +577,77 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
 function getPositionReturn(position?: PaperPosition) {
   if (!position?.averageCost || !position.quantity) return 0;
   return position.unrealizedPnl / (position.averageCost * position.quantity);
+}
+
+function parseOptionalNumber(value: string) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined;
+}
+
+function getLatestPlanBySymbol(trades: PaperTrade[]) {
+  const plans = new Map<string, PaperTrade>();
+
+  [...trades]
+    .sort((left, right) => right.timestamp - left.timestamp)
+    .forEach((trade) => {
+      if (!plans.has(trade.symbol) && hasBracketPlan(trade)) plans.set(trade.symbol, trade);
+    });
+
+  return plans;
+}
+
+function hasBracketPlan(trade: Pick<PaperTrade, "stopLoss" | "takeProfit" | "trailingStopPercent">) {
+  return Boolean(trade.stopLoss || trade.takeProfit || trade.trailingStopPercent);
+}
+
+function getRiskMetrics({
+  price,
+  quantity,
+  stopLoss,
+  takeProfit,
+}: {
+  price: number;
+  quantity: number;
+  stopLoss?: number;
+  takeProfit?: number;
+}) {
+  const riskAmount = stopLoss ? Math.abs(price - stopLoss) * quantity : 0;
+  const rewardAmount = takeProfit ? Math.abs(takeProfit - price) * quantity : 0;
+
+  return {
+    rewardAmount,
+    rewardRisk: riskAmount && rewardAmount ? rewardAmount / riskAmount : 0,
+    riskAmount,
+  };
+}
+
+function formatRewardRisk(value: number) {
+  return value ? `${formatCompact(value, 2)}R` : "No target";
+}
+
+function formatOrderLabel(order: {
+  limitPrice?: number;
+  orderType?: PaperOrderType;
+  stopPrice?: number;
+  timeInForce?: PaperTimeInForce;
+}) {
+  const orderType = order.orderType ?? "market";
+  const pieces = [ORDER_TYPE_LABELS[orderType], TIME_IN_FORCE_LABELS[order.timeInForce ?? "day"]];
+
+  if (order.limitPrice) pieces.push(`L ${formatPrice(order.limitPrice)}`);
+  if (order.stopPrice) pieces.push(`S ${formatPrice(order.stopPrice)}`);
+
+  return pieces.join(" · ");
+}
+
+function formatBracketSummary(trade: Pick<PaperTrade, "stopLoss" | "takeProfit" | "trailingStopPercent">) {
+  const pieces = [];
+
+  if (trade.stopLoss) pieces.push(`Stop ${formatPrice(trade.stopLoss)}`);
+  if (trade.takeProfit) pieces.push(`Target ${formatPrice(trade.takeProfit)}`);
+  if (trade.trailingStopPercent) pieces.push(`Trail ${formatCompact(trade.trailingStopPercent, 1)}%`);
+
+  return pieces.length ? pieces.join(" / ") : "No bracket";
 }
 
 function PaperMetric({

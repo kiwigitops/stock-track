@@ -1028,6 +1028,7 @@ select option {
 .paper-ticket label > span,
 .paper-quote-lockup span,
 .quote-tape span,
+.bracket-panel .panel-heading > span,
 .ticket-preview span {
   display: flex;
   align-items: center;
@@ -1163,6 +1164,8 @@ select option {
 }
 
 .quote-tape,
+.order-options,
+.bracket-grid,
 .ticket-grid,
 .ticket-preview {
   display: grid;
@@ -1177,8 +1180,40 @@ select option {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.order-options {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+}
+
+.order-trigger-grid {
+  padding: var(--space-3);
+  border: 1px solid rgba(100, 210, 255, 0.12);
+  border-radius: var(--radius-panel);
+  background: rgba(100, 210, 255, 0.055);
+}
+
+.bracket-panel {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid rgba(255, 214, 10, 0.12);
+  border-radius: var(--radius-panel);
+  background: rgba(255, 214, 10, 0.045);
+}
+
+.compact-heading {
+  margin-bottom: 0;
+}
+
+.bracket-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .ticket-preview {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ticket-preview > div:first-child {
+  grid-column: 1 / -1;
 }
 
 .quote-tape > div,
@@ -1350,6 +1385,34 @@ select option {
   white-space: nowrap;
 }
 
+.position-plan {
+  display: grid;
+  gap: 2px;
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid rgba(255, 214, 10, 0.12);
+  border-radius: var(--radius-panel);
+  background: rgba(255, 214, 10, 0.05);
+}
+
+.position-plan span,
+.position-plan em {
+  color: rgba(245, 247, 251, 0.56);
+  font-size: 0.7rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.position-plan strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.position-plan em {
+  text-transform: none;
+}
+
 .paper-empty {
   display: grid;
   min-height: 210px;
@@ -1375,7 +1438,7 @@ select option {
 .ledger-head,
 .ledger-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.2fr) minmax(96px, 0.65fr) 64px minmax(86px, 0.65fr) minmax(86px, 0.65fr) minmax(104px, 0.75fr) minmax(0, 1fr);
+  grid-template-columns: minmax(140px, 1.1fr) minmax(86px, 0.6fr) 56px minmax(112px, 0.85fr) minmax(74px, 0.55fr) minmax(82px, 0.62fr) minmax(96px, 0.68fr) minmax(112px, 0.78fr) minmax(0, 1fr);
   gap: var(--space-2);
   align-items: center;
 }
@@ -2542,6 +2605,8 @@ select option {
   .technical-grid,
   .paper-summary,
   .quote-tape,
+  .order-options,
+  .bracket-grid,
   .ticket-preview,
   .trend-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2638,6 +2703,8 @@ select option {
   .broker-panels,
   .paper-summary,
   .quote-tape,
+  .order-options,
+  .bracket-grid,
   .ticket-grid,
   .ticket-preview,
   .positions-grid,

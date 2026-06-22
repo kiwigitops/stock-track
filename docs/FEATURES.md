@@ -42,11 +42,13 @@
 ## Paper Trading
 
 - Paper trades are saved locally in IndexedDB.
-- Broker-style order console records buy/sell, symbol, quantity, price, and optional note.
+- Broker-style order console records buy/sell, symbol, quantity, fill price, order type, time in force, trigger prices, and optional note.
+- Advanced paper order instructions include market, limit, stop, stop-limit, day, and GTC.
+- Risk brackets can store stop loss, take profit, and trailing-stop percent with reward/risk readouts.
 - The paper workspace can open the expanded stock popup from the active order symbol, position cards, and ledger rows.
 - Portfolio view recalculates cash, market value, equity, unrealized P/L, realized P/L, and total P/L from saved trades.
 - Positions are marked to current delayed quote prices.
-- Ledger shows recent paper fills with symbols, side, quantity, price, notional, notes, and local reset controls.
+- Ledger shows recent paper fills with symbols, side, order instruction, quantity, fill price, notional, risk plan, notes, and local reset controls.
 
 ## About And Privacy
 

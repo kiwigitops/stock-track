@@ -33,6 +33,7 @@
 - `src/hooks/usePaperTrades.ts` loads, appends, and clears saved trades.
 - `src/lib/paperTrading.ts` is the local paper-trading module:
   - Creates normalized trade events.
+  - Stores optional simulated order instructions: market/limit/stop/stop-limit, time in force, trigger prices, stop loss, take profit, and trailing stop.
   - Persists trade events in IndexedDB with a localStorage fallback.
   - Recalculates positions, cash, equity, realized P/L, unrealized P/L, and total P/L from the saved ledger.
 
