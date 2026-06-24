@@ -102,6 +102,11 @@ export function PaperTradeDesk({ cash, onCashChange, onOpenQuote, quotes }: Pape
       return;
     }
 
+    if (side === "buy" && cleanQuantity * cleanPrice > portfolio.cash) {
+      setError(`Buy size exceeds current buying power of ${formatMoney(portfolio.cash)}.`);
+      return;
+    }
+
     if (side === "buy" && plannedStopLoss && plannedStopLoss >= cleanPrice) {
       setError("For a buy plan, stop loss should sit below the fill price.");
       return;
