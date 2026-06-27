@@ -213,7 +213,10 @@ function transactionToPromise(transaction: IDBTransaction) {
 function readFallbackTrades() {
   try {
     const raw = window.localStorage.getItem(FALLBACK_KEY);
-    return raw ? (JSON.parse(raw) as PaperTrade[]) : [];
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as PaperTrade[]) : [];
   } catch {
     return [];
   }
